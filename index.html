@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Chess Game</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-family: 'Arial', sans-serif;
+            background: #f9f9f9;
+            margin: 0;
+            padding: 20px;
+        }
+        h1 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+        #board {
+            display: grid;
+            grid-template-columns: repeat(8, 70px);
+            border: 2px solid #333;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            margin-bottom: 20px;
+        }
+        .square {
+            width: 70px;
+            height: 70px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 48px;
+            cursor: pointer;
+            transition: background 0.3s, transform 0.2s;
+        }
+        .light { background: #f0d9a1; }
+        .dark { background: #b58863; }
+        .selected { background: #ffeb3b; transform: scale(1.05); }
+        .check { background: #ff0000; color: white; }
+        #info {
+            font-size: 20px;
+            margin-bottom: 20px;
+            color: #555;
+            text-align: center;
+        }
+        #restart {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 18px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        #restart:hover {
+            background-color: #45a049;
+        }
+        @media (max-width: 600px) {
+            #board {
+                grid-template-columns: repeat(8, 50px);
+                width: 400px;
+            }
+            .square {
+                width: 50px;
+                height: 50px;
+                font-size: 32px;
+            }
+            #info {
+                font-size: 16px;
+            }
+            #restart {
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<h1>Simple Chess Game</h1>
+<div id="info">Select a piece to move!</div>
+<div id="board"></div>
+<button id="restart">Restart Game</button>
+
+<script>
+    const boardElement = document.getElementById('board');
+    const infoElement = document.getElementById('info');
+    const restartButton = document.getElementById('restart');
+    const pieces = {
+        r: '♖', n: '♘', b: '♗', q: '♕', k: '♔', p: '♙',
+        R: '♜', N: '♞', B: '♟', Q: '♛', K: '♚', P: '♟',
+    };
+
+    const initialBoard = [
+        'rnbqkbnr',
+        'pppppppp',
+        '        ',
+        '        ',
+        '        ',
+        '        ',
+        'PPPPPPPP',
+        'RNBQKBNR'
+    ];
+
+    let currentBoard = JSON.parse(JSON.stringify(initialBoard));
+    let selectedSquare = null;
+    let whiteToMove = true;
+
+    restartButton.addEventListener('click', resetGame);
+
+    function resetGame() {
+        currentBoard = JSON.parse(JSON.stringify(initialBoard));
+        selectedSquare = null;
+        whiteToMove = true;
+        infoElement.textContent = "Select a piece to move!";
+        setupBoard();
+    }
+
+    function setupBoard() {
+        boardElement.innerHTML = '';
+        currentBoard.forEach((row, i) => {
+            row.split('').forEach((piece, j) => {
+                const square = document.createElement('div');
+                square.className = 'square ' + ((i + j) % 2 === 0 ? 'light' : 'dark');
+                square.textContent = pieces[piece] || '';
+                square.dataset.position = `${i}-${j}`;
+                square.addEventListener('click', handleSquareClick);
+                boardElement.appendChild(square);
+            });
+        });
+        checkGameStatus();
+    }
+
+    function handleSquareClick(event) {
+        const square = event.target;
+        const position = square.dataset.position;
+
+        if (selectedSquare) {
+            const fromPos = selectedSquare.dataset.position;
+            if (isValidMove(fromPos, position)) {
+                makeMove(fromPos, position);
+                selectedSquare.classList.remove('selected');
+                selectedSquare = null;
+                infoElement.textContent = "Select a piece to move!";
+                
+                if (!whiteToMove) {
+                    setTimeout(() => {
+                        daDuckMove();
+                    }, Math.floor(Math.random() * 1000) + 1000);
+                }
+            } else {
+                infoElement.textContent = "Invalid move!";
+            }
+        } else {
+            if (square.textContent) {
+                selectedSquare = square;
+                selectedSquare.classList.add('selected');
+                infoElement.textContent = `Selected: ${square.textContent}`;
+            }
+        }
+    }
+
+    function daDuckMove() {
+        const bestMove = findBestMove(3);
+        if (bestMove) {
+            const [fromRow, fromCol] = bestMove.from.split('-').map(Number);
+            const [toRow, toCol] = bestMove.to.split('-').map(Number);
+            makeMove(bestMove.from, bestMove.to);
+            infoElement.textContent = "Da Duck played: " + pieces[currentBoard[toRow][toCol]];
+        }
+    }
+
+    function findBestMove(depth) {
+        let bestScore = -Infinity;
+        let bestMove = null;
+
+        for (let row = 0; row < 8; row++) {
+            for (let col = 0; col < 8; col++) {
+                const piece = currentBoard[row][col];
+                if (piece !== ' ' && piece.toLowerCase() !== piece) { // Black pieces
+                    const currentPos = `${row}-${col}`;
+                    for (let targetRow = 0; targetRow < 8; targetRow++) {
+                        for (let targetCol = 0; targetCol < 8; targetCol++) {
+                            const targetPos = `${targetRow}-${targetCol}`;
+                            if (isValidMove(currentPos, targetPos)) {
+                                const originalBoard = JSON.parse(JSON.stringify(currentBoard));
+                                makeMove(currentPos, targetPos);
+                                const score = minimax(depth - 1, false);
+                                currentBoard = originalBoard;
+
+                                if (score > bestScore) {
+                                    bestScore = score;
+                                    bestMove = { from: currentPos, to: targetPos };
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return bestMove;
+    }
+
+    function minimax(depth, isMaximizing) {
+        if (depth === 0) {
+            return evaluateBoard();
+        }
+
+        const moves = generateAllPossibleMoves(isMaximizing ? 'K' : 'k');
+
+        if (isMaximizing) {
+            let bestScore = -Infinity;
+            for (const move of moves) {
+                const originalBoard = JSON.parse(JSON.stringify(currentBoard));
+                makeMove(move.from, move.to);
+                const score = minimax(depth - 1, false);
+                currentBoard = originalBoard;
+                bestScore = Math.max(bestScore, score);
+            }
+            return bestScore;
+        } else {
+            let bestScore = Infinity;
+            for (const move of moves) {
+                const originalBoard = JSON.parse(JSON.stringify(currentBoard));
+                makeMove(move.from, move.to);
+                const score = minimax(depth - 1, true);
+                currentBoard = originalBoard;
+                bestScore = Math.min(bestScore, score);
+            }
+            return bestScore;
+        }
+    }
+
+    function evaluateBoard() {
+        const pieceValues = {
+            'p': 1, 'r': 5, 'n': 3, 'b': 3, 'q': 9, 'k': 0,
+            'P': -1, 'R': -5, 'N': -3, 'B': -3, 'Q': -9, 'K': 0,
+        };
+
+        let score = 0;
+        currentBoard.forEach(row => {
+            row.split('').forEach(piece => {
+                score += pieceValues[piece] || 0;
+            });
+        });
+        return score;
+    }
+
+    function generateAllPossibleMoves(king) {
+        const moves = [];
+        for (let row = 0; row < 8; row++) {
+            for (let col = 0; col < 8; col++) {
+                const piece = currentBoard[row][col];
+                if (piece !== ' ' && (king === 'K' ? piece === piece.toUpperCase() : piece === piece.toLowerCase())) {
+                    const currentPos = `${row}-${col}`;
+                    for (let targetRow = 0; targetRow < 8; targetRow++) {
+                        for (let targetCol = 0; targetCol < 8; targetCol++) {
+                            const targetPos = `${targetRow}-${targetCol}`;
+                            if (isValidMove(currentPos, targetPos)) {
+                                moves.push({ from: currentPos, to: targetPos });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return moves;
+    }
+
+    function isValidMove(from, to) {
+        const [fromRow, fromCol] = from.split('-').map(Number);
+        const [toRow, toCol] = to.split('-').map(Number);
+        const piece = currentBoard[fromRow][fromCol];
+        const targetPiece = currentBoard[toRow][toCol];
+
+        if (targetPiece !== ' ' && piece.toLowerCase() === targetPiece.toLowerCase()) {
+            return false; // Can't capture own piece
+        }
+
+        switch (piece.toLowerCase()) {
+            case 'p':
+                if (piece === 'p' && toRow === fromRow - 1 && toCol === fromCol && targetPiece === ' ') return true; // White pawn move
+                if (piece === 'P' && toRow === fromRow + 1 && toCol === fromCol && targetPiece === ' ') return true; // Black pawn move
+                break;
+            case 'r':
+                if (isValidRookMove(fromRow, fromCol, toRow, toCol)) return true;
+                break;
+            case 'n':
+                if (isValidKnightMove(fromRow, fromCol, toRow, toCol)) return true;
+                break;
+            case 'b':
+                if (isValidBishopMove(fromRow, fromCol, toRow, toCol)) return true;
+                break;
+            case 'q':
+                if (isValidQueenMove(fromRow, fromCol, toRow, toCol)) return true;
+                break;
+            case 'k':
+                if (isValidKingMove(fromRow, fromCol, toRow, toCol)) return true;
+                break;
+            default:
+                return false; // Default to invalid
+        }
+
+        return false; // If no valid move found
+    }
+
+    function makeMove(from, to) {
+        const [fromRow, fromCol] = from.split('-').map(Number);
+        const [toRow, toCol] = to.split('-').map(Number);
+        const piece = currentBoard[fromRow][fromCol];
+
+        currentBoard[toRow][toCol] = piece;
+        currentBoard[fromRow][fromCol] = ' ';
+        
+        whiteToMove = !whiteToMove; 
+        setupBoard();
+    }
+
+    function isInCheck(king) {
+        const kingPosition = findKing(king);
+        if (!kingPosition) return false;
+
+        const [kingRow, kingCol] = kingPosition;
+        for (let row = 0; row < 8; row++) {
+            for (let col = 0; col < 8; col++) {
+                const piece = currentBoard[row][col];
+                if (piece !== ' ' && piece.toUpperCase() !== king) {
+                    if (isValidMove(`${row}-${col}`, `${kingRow}-${kingCol}`)) {
+                        return true; 
+                    }
+                }
+            }
+        }
+        return false; 
+    }
+
+    function findKing(king) {
+        for (let row = 0; row < 8; row++) {
+            for (let col = 0; col < 8; col++) {
+                if (currentBoard[row][col] === king) {
+                    return [row, col];
+                }
+            }
+        }
+        return null; 
+    }
+
+    function checkGameStatus() {
+        if (isInCheck(whiteToMove ? 'K' : 'k')) {
+            infoElement.textContent = `${whiteToMove ? 'White' : 'Black'} is in check!`;
+        }
+    }
+
+    function isValidRookMove(fromRow, fromCol, toRow, toCol) {
+        return (fromRow === toRow || fromCol === toCol) && isPathClear(fromRow, fromCol, toRow, toCol);
+    }
+
+    function isValidKnightMove(fromRow, fromCol, toRow, toCol) {
+        return (Math.abs(fromRow - toRow) === 2 && Math.abs(fromCol - toCol) === 1) || 
+               (Math.abs(fromRow - toRow) === 1 && Math.abs(fromCol - toCol) === 2);
+    }
+
+    function isValidBishopMove(fromRow, fromCol, toRow, toCol) {
+        return Math.abs(fromRow - toRow) === Math.abs(fromCol - toCol) && isPathClear(fromRow, fromCol, toRow, toCol);
+    }
+
+    function isValidQueenMove(fromRow, fromCol, toRow, toCol) {
+        return isValidRookMove(fromRow, fromCol, toRow, toCol) || isValidBishopMove(fromRow, fromCol, toRow, toCol);
+    }
+
+    function isValidKingMove(fromRow, fromCol, toRow, toCol) {
+        return Math.abs(fromRow - toRow) <= 1 && Math.abs(fromCol - toCol) <= 1;
+    }
+
+    function isPathClear(fromRow, fromCol, toRow, toCol) {
+        const rowDirection = toRow > fromRow ? 1 : toRow < fromRow ? -1 : 0;
+        const colDirection = toCol > fromCol ? 1 : toCol < fromCol ? -1 : 0;
+
+        let row = fromRow + rowDirection;
+        let col = fromCol + colDirection;
+
+        while (row !== toRow || col !== toCol) {
+            if (currentBoard[row][col] !== ' ') {
+                return false; 
+            }
+            row += rowDirection;
+            col += colDirection;
+        }
+        return true; 
+    }
+
+    setupBoard();
+</script>
+
+</body>
+</html>
