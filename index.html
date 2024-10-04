@@ -94,184 +94,36 @@
                 selectedSquare.classList.remove('selected');
                 selectedSquare = null;
                 infoElement.textContent = "Select a piece to move!";
-                
-                if (!whiteToMove) {
-                    setTimeout(() => {
-                        daDuckMove();
-                    }, 1000);
-                }
-            } else {
-                infoElement.textContent = "Invalid move!";
+                whiteToMove = !whiteToMove; // Switch turn
             }
         } else {
-            if (square.textContent) {
+            if (isValidSelection(square)) {
                 selectedSquare = square;
                 selectedSquare.classList.add('selected');
-                infoElement.textContent = `Selected: ${square.textContent}`;
+                infoElement.textContent = "Select a destination square!";
             }
         }
     }
 
-    function makeMove(from, to) {
-        const [fromRow, fromCol] = from.split('-').map(Number);
-        const [toRow, toCol] = to.split('-').map(Number);
+    function isValidSelection(square) {
+        const position = square.dataset.position;
+        const piece = currentBoard[position.split('-')[0]][position.split('-')[1]];
+        const isWhitePiece = piece === piece.toUpperCase();
+        return (whiteToMove && isWhitePiece) || (!whiteToMove && piece === piece.toLowerCase());
+    }
+
+    function makeMove(fromPos, toPos) {
+        const fromRow = parseInt(fromPos.split('-')[0]);
+        const fromCol = parseInt(fromPos.split('-')[1]);
+        const toRow = parseInt(toPos.split('-')[0]);
+        const toCol = parseInt(toPos.split('-')[1]);
+
+        // Basic move logic (without validation of rules)
         const piece = currentBoard[fromRow][fromCol];
-
-        // Check for valid move
-        if (!isValidMove(from, to)) {
-            return false; // Move is invalid
-        }
-
         currentBoard[toRow][toCol] = piece;
         currentBoard[fromRow][fromCol] = ' ';
-
-        // Check for check condition
-        if (isInCheck(whiteToMove ? 'K' : 'k')) {
-            // Revert move if it puts the king in check
-            currentBoard[fromRow][fromCol] = piece;
-            currentBoard[toRow][toCol] = ' ';
-            return false; // Move is invalid
-        }
-
-        whiteToMove = !whiteToMove;
         setupBoard();
-        return true; // Move is valid
-    }
-
-    function isInCheck(king) {
-        const kingPosition = findKing(king);
-        if (!kingPosition) return false;
-
-        const [kingRow, kingCol] = kingPosition;
-        for (let row = 0; row < 8; row++) {
-            for (let col = 0; col < 8; col++) {
-                const piece = currentBoard[row][col];
-                if (piece !== ' ' && piece.toUpperCase() !== king) {
-                    if (isValidMove(`${row}-${col}`, `${kingRow}-${kingCol}`)) {
-                        return true; 
-                    }
-                }
-            }
-        }
-        return false; 
-    }
-
-    function findKing(king) {
-        for (let row = 0; row < 8; row++) {
-            for (let col = 0; col < 8; col++) {
-                if (currentBoard[row][col] === king) {
-                    return [row, col];
-                }
-            }
-        }
-        return null; 
-    }
-
-    function isValidMove(from, to) {
-        const [fromRow, fromCol] = from.split('-').map(Number);
-        const [toRow, toCol] = to.split('-').map(Number);
-        const piece = currentBoard[fromRow][fromCol];
-        const targetPiece = currentBoard[toRow][toCol];
-
-        // Cannot capture own piece
-        if (targetPiece !== ' ' && piece.toLowerCase() === targetPiece.toLowerCase()) {
-            return false; 
-        }
-
-        switch (piece.toLowerCase()) {
-            case 'p':
-                return isValidPawnMove(piece, fromRow, fromCol, toRow, toCol, targetPiece);
-            case 'r':
-                return isValidRookMove(fromRow, fromCol, toRow, toCol);
-            case 'n':
-                return isValidKnightMove(fromRow, fromCol, toRow, toCol);
-            case 'b':
-                return isValidBishopMove(fromRow, fromCol, toRow, toCol);
-            case 'q':
-                return isValidQueenMove(fromRow, fromCol, toRow, toCol);
-            case 'k':
-                return isValidKingMove(fromRow, fromCol, toRow, toCol);
-            default:
-                return false; 
-        }
-    }
-
-    function isValidPawnMove(piece, fromRow, fromCol, toRow, toCol, targetPiece) {
-        const direction = piece === 'P' ? -1 : 1; // White moves up, black moves down
-        const startRow = piece === 'P' ? 6 : 1;
-
-        // Normal move
-        if (toRow === fromRow + direction && toCol === fromCol && targetPiece === ' ') {
-            return true;
-        }
-
-        // Double move from starting position
-        if (fromRow === startRow && toRow === fromRow + 2 * direction && toCol === fromCol && targetPiece === ' ' && currentBoard[fromRow + direction][fromCol] === ' ') {
-            return true;
-        }
-
-        // Capture
-        if (toRow === fromRow + direction && Math.abs(toCol - fromCol) === 1 && targetPiece !== ' ') {
-            return true;
-        }
-
-        return false; 
-    }
-
-    function isValidRookMove(fromRow, fromCol, toRow, toCol) {
-        return (fromRow === toRow || fromCol === toCol) && isPathClear(fromRow, fromCol, toRow, toCol);
-    }
-
-    function isValidKnightMove(fromRow, fromCol, toRow, toCol) {
-        return (Math.abs(fromRow - toRow) === 2 && Math.abs(fromCol - toCol) === 1) || 
-               (Math.abs(fromRow - toRow) === 1 && Math.abs(fromCol - toCol) === 2);
-    }
-
-    function isValidBishopMove(fromRow, fromCol, toRow, toCol) {
-        return Math.abs(fromRow - toRow) === Math.abs(fromCol - toCol) && isPathClear(fromRow, fromCol, toRow, toCol);
-    }
-
-    function isValidQueenMove(fromRow, fromCol, toRow, toCol) {
-        return isValidRookMove(fromRow, fromCol, toRow, toCol) || isValidBishopMove(fromRow, fromCol, toRow, toCol);
-    }
-
-    function isValidKingMove(fromRow, fromCol, toRow, toCol) {
-        return Math.abs(fromRow - toRow) <= 1 && Math.abs(fromCol - toCol) <= 1;
-    }
-
-    function isPathClear(fromRow, fromCol, toRow, toCol) {
-        const rowDirection = toRow > fromRow ? 1 : toRow < fromRow ? -1 : 0;
-        const colDirection = toCol > fromCol ? 1 : toCol < fromCol ? -1 : 0;
-
-        let row = fromRow + rowDirection;
-        let col = fromCol + colDirection;
-
-        while (row !== toRow || col !== toCol) {
-            if (currentBoard[row][col] !== ' ') {
-                return false; 
-            }
-            row += rowDirection;
-            col += colDirection;
-        }
-        return true; 
-    }
-
-    function daDuckMove() {
-        // Simple AI to move a random piece for demonstration
-        for (let row = 0; row < 8; row++) {
-            for (let col = 0; col < 8; col++) {
-                const piece = currentBoard[row][col];
-                if (piece !== ' ' && piece.toLowerCase() === 'r') { // Example: move a rook
-                    const targetRow = row + 1; // Example: simple down move
-                    if (targetRow < 8 && isValidMove(`${row}-${col}`, `${targetRow}-${col}`)) {
-                        makeMove(`${row}-${col}`, `${targetRow}-${col}`);
-                        infoElement.textContent = "Da Duck moved!";
-                        return;
-                    }
-                }
-            }
-        }
-        infoElement.textContent = "Da Duck has no valid moves!";
+        return true;
     }
 
     setupBoard();
