@@ -23,6 +23,7 @@
             margin-bottom: 20px;
             width: 480px;
             height: 480px;
+            position: relative;
         }
         .square {
             display: flex;
@@ -60,6 +61,16 @@
             font-size: 20px;
             color: #ff0000;
             margin-top: 20px;
+        }
+        @keyframes moveAnimation {
+            from { transform: scale(1); }
+            to { transform: scale(1.2); }
+        }
+        .moving {
+            animation: moveAnimation 0.3s ease forwards;
+        }
+        .hidden {
+            visibility: hidden;
         }
     </style>
 </head>
@@ -124,6 +135,7 @@
         if (selectedSquare) {
             const fromPos = selectedSquare.dataset.position;
             if (makeMove(fromPos, position)) {
+                animateMove(fromPos, position);
                 selectedSquare.classList.remove('selected');
                 clearValidMoves();
                 selectedSquare = null;
@@ -147,10 +159,23 @@
         }
     }
 
+    function animateMove(fromPos, toPos) {
+        const fromSquare = document.querySelector(`[data-position="${fromPos}"]`);
+        const toSquare = document.querySelector(`[data-position="${toPos}"]`);
+        const piece = fromSquare.textContent;
+
+        fromSquare.textContent = '';
+        toSquare.textContent = piece;
+
+        toSquare.classList.add('moving');
+
+        setTimeout(() => {
+            toSquare.classList.remove('moving');
+        }, 300);
+    }
+
     function highlightValidMoves() {
         const position = selectedSquare.dataset.position;
-        const piece = currentBoard[position.split('-')[0]][position.split('-')[1]];
-
         for (let r = 0; r < 8; r++) {
             for (let c = 0; c < 8; c++) {
                 const toPos = `${r}-${c}`;
@@ -227,30 +252,23 @@
         if (piece.toLowerCase() === 'k') {
             return isValidKingMove(fromRow, fromCol, toRow, toCol);
         }
-        return false; // Default to invalid
+        return false;
     }
 
     function isValidPawnMove(piece, fromRow, fromCol, toRow, toCol) {
-        const direction = piece === 'P' ? -1 : 1; // White moves up, black moves down
-        const startRow = piece === 'P' ? 6 : 1;
+        const direction = (piece === 'P') ? -1 : 1; // White moves up, black moves down
+        const startRow = (piece === 'P') ? 6 : 1;
+        const validForwardMove = (toRow === fromRow + direction && toCol === fromCol && currentBoard[toRow][toCol] === ' ');
+        const validDoubleMove = (fromRow === startRow && toRow === fromRow + 2 * direction && toCol === fromCol && currentBoard[toRow][toCol] === ' ' && currentBoard[fromRow + direction][toCol] === ' ');
 
-        // Normal move
-        if (toRow === fromRow + direction && toCol === fromCol && currentBoard[toRow][toCol] === ' ') {
-            return true;
-        }
+        const validCaptureMove = (toRow === fromRow + direction && Math.abs(toCol - fromCol) === 1 && currentBoard[toRow][toCol] !== ' ' && isOpponentPiece(piece, currentBoard[toRow][toCol]));
 
-        // Double move from starting position
-        if (fromRow === startRow && toRow === fromRow + 2 * direction && toCol === fromCol &&
-            currentBoard[toRow - direction][toCol] === ' ' && currentBoard[toRow][toCol] === ' ') {
-            return true;
-        }
+        return validForwardMove || validDoubleMove || validCaptureMove;
+    }
 
-        // Capture
-        if (toRow === fromRow + direction && Math.abs(toCol - fromCol) === 1 && currentBoard[toRow][toCol] !== ' ') {
-            return true;
-        }
-
-        return false; 
+    function isOpponentPiece(piece, targetPiece) {
+        return (piece === piece.toUpperCase() && targetPiece === targetPiece.toLowerCase()) ||
+               (piece === piece.toLowerCase() && targetPiece === targetPiece.toUpperCase());
     }
 
     function isValidRookMove(fromRow, fromCol, toRow, toCol) {
