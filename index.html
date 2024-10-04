@@ -118,12 +118,105 @@
         const toRow = parseInt(toPos.split('-')[0]);
         const toCol = parseInt(toPos.split('-')[1]);
 
-        // Basic move logic (without validation of rules)
         const piece = currentBoard[fromRow][fromCol];
+
+        if (!isValidMove(fromPos, toPos)) {
+            return false; // Move is invalid
+        }
+
         currentBoard[toRow][toCol] = piece;
         currentBoard[fromRow][fromCol] = ' ';
         setupBoard();
         return true;
+    }
+
+    function isValidMove(from, to) {
+        const [fromRow, fromCol] = from.split('-').map(Number);
+        const [toRow, toCol] = to.split('-').map(Number);
+        const piece = currentBoard[fromRow][fromCol];
+
+        if (piece === ' ') return false; // No piece to move
+
+        // General movement rules
+        if (piece.toLowerCase() === 'p') {
+            return isValidPawnMove(piece, fromRow, fromCol, toRow, toCol);
+        }
+        if (piece.toLowerCase() === 'r') {
+            return isValidRookMove(fromRow, fromCol, toRow, toCol);
+        }
+        if (piece.toLowerCase() === 'n') {
+            return isValidKnightMove(fromRow, fromCol, toRow, toCol);
+        }
+        if (piece.toLowerCase() === 'b') {
+            return isValidBishopMove(fromRow, fromCol, toRow, toCol);
+        }
+        if (piece.toLowerCase() === 'q') {
+            return isValidQueenMove(fromRow, fromCol, toRow, toCol);
+        }
+        if (piece.toLowerCase() === 'k') {
+            return isValidKingMove(fromRow, fromCol, toRow, toCol);
+        }
+        return false; // Default to invalid
+    }
+
+    function isValidPawnMove(piece, fromRow, fromCol, toRow, toCol) {
+        const direction = piece === 'P' ? -1 : 1; // White moves up, black moves down
+        const startRow = piece === 'P' ? 6 : 1;
+
+        // Normal move
+        if (toRow === fromRow + direction && toCol === fromCol && currentBoard[toRow][toCol] === ' ') {
+            return true;
+        }
+
+        // Double move from starting position
+        if (fromRow === startRow && toRow === fromRow + 2 * direction && toCol === fromCol && currentBoard[toRow - direction][toCol] === ' ' && currentBoard[toRow][toCol] === ' ') {
+            return true;
+        }
+
+        // Capture
+        if (toRow === fromRow + direction && Math.abs(toCol - fromCol) === 1 && currentBoard[toRow][toCol] !== ' ') {
+            return true;
+        }
+
+        return false; 
+    }
+
+    function isValidRookMove(fromRow, fromCol, toRow, toCol) {
+        return (fromRow === toRow || fromCol === toCol) && isPathClear(fromRow, fromCol, toRow, toCol);
+    }
+
+    function isValidKnightMove(fromRow, fromCol, toRow, toCol) {
+        return (Math.abs(fromRow - toRow) === 2 && Math.abs(fromCol - toCol) === 1) || 
+               (Math.abs(fromRow - toRow) === 1 && Math.abs(fromCol - toCol) === 2);
+    }
+
+    function isValidBishopMove(fromRow, fromCol, toRow, toCol) {
+        return Math.abs(fromRow - toRow) === Math.abs(fromCol - toCol) && isPathClear(fromRow, fromCol, toRow, toCol);
+    }
+
+    function isValidQueenMove(fromRow, fromCol, toRow, toCol) {
+        return isValidRookMove(fromRow, fromCol, toRow, toCol) || isValidBishopMove(fromRow, fromCol, toRow, toCol);
+    }
+
+    function isValidKingMove(fromRow, fromCol, toRow, toCol) {
+        return Math.abs(fromRow - toRow) <= 1 && Math.abs(fromCol - toCol) <= 1;
+    }
+
+    function isPathClear(fromRow, fromCol, toRow, toCol) {
+        const rowDirection = toRow > fromRow ? 1 : toRow < fromRow ? -1 : 0;
+        const colDirection = toCol > fromCol ? 1 : toCol < fromCol ? -1 : 0;
+
+        let row = fromRow + rowDirection;
+        let col = fromCol + colDirection;
+
+        while (row !== toRow || col !== toCol) {
+            if (currentBoard[row][col] !== ' ') {
+                return false; 
+            }
+            row += rowDirection;
+            col += colDirection;
+        }
+        return true; 
     }
 
     setupBoard();
