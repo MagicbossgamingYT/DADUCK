@@ -173,19 +173,14 @@
         const piece = currentBoard[fromRow][fromCol];
         const targetPiece = currentBoard[toRow][toCol];
 
+        // Cannot capture own piece
         if (targetPiece !== ' ' && piece.toLowerCase() === targetPiece.toLowerCase()) {
-            return false; // Can't capture own piece
+            return false; 
         }
 
         switch (piece.toLowerCase()) {
             case 'p':
-                if (piece === 'p' && toRow === fromRow - 1 && toCol === fromCol && targetPiece === ' ') return true; // White pawn move
-                if (piece === 'P' && toRow === fromRow + 1 && toCol === fromCol && targetPiece === ' ') return true; // Black pawn move
-                if (piece === 'p' && fromRow === 6 && toRow === fromRow - 2 && toCol === fromCol && targetPiece === ' ' && currentBoard[fromRow - 1][fromCol] === ' ') return true; // White pawn double move
-                if (piece === 'P' && fromRow === 1 && toRow === fromRow + 2 && toCol === fromCol && targetPiece === ' ' && currentBoard[fromRow + 1][fromCol] === ' ') return true; // Black pawn double move
-                if (piece === 'p' && toRow === fromRow - 1 && Math.abs(toCol - fromCol) === 1 && targetPiece !== ' ') return true; // White pawn capture
-                if (piece === 'P' && toRow === fromRow + 1 && Math.abs(toCol - fromCol) === 1 && targetPiece !== ' ') return true; // Black pawn capture
-                break;
+                return isValidPawnMove(piece, fromRow, fromCol, toRow, toCol, targetPiece);
             case 'r':
                 return isValidRookMove(fromRow, fromCol, toRow, toCol);
             case 'n':
@@ -197,10 +192,30 @@
             case 'k':
                 return isValidKingMove(fromRow, fromCol, toRow, toCol);
             default:
-                return false; // Default to invalid
+                return false; 
+        }
+    }
+
+    function isValidPawnMove(piece, fromRow, fromCol, toRow, toCol, targetPiece) {
+        const direction = piece === 'P' ? -1 : 1; // White moves up, black moves down
+        const startRow = piece === 'P' ? 6 : 1;
+
+        // Normal move
+        if (toRow === fromRow + direction && toCol === fromCol && targetPiece === ' ') {
+            return true;
         }
 
-        return false; // If no valid move found
+        // Double move from starting position
+        if (fromRow === startRow && toRow === fromRow + 2 * direction && toCol === fromCol && targetPiece === ' ' && currentBoard[fromRow + direction][fromCol] === ' ') {
+            return true;
+        }
+
+        // Capture
+        if (toRow === fromRow + direction && Math.abs(toCol - fromCol) === 1 && targetPiece !== ' ') {
+            return true;
+        }
+
+        return false; 
     }
 
     function isValidRookMove(fromRow, fromCol, toRow, toCol) {
@@ -242,7 +257,7 @@
     }
 
     function daDuckMove() {
-        // Basic AI for demonstration: move the first available black piece
+        // Simple AI to move a random piece for demonstration
         for (let row = 0; row < 8; row++) {
             for (let col = 0; col < 8; col++) {
                 const piece = currentBoard[row][col];
