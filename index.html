@@ -3,53 +3,95 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simple Chess Game</title>
+    <title>Da Duck Chess Game</title>
     <style>
         body {
             display: flex;
             flex-direction: column;
             align-items: center;
             font-family: Arial, sans-serif;
-            background: #f0f0f0;
+            background: #f4f4f4;
         }
         h1 {
             margin-bottom: 20px;
+            color: #333;
         }
         #board {
             display: grid;
-            grid-template-columns: repeat(8, 60px);
+            grid-template-columns: repeat(8, 1fr);
             border: 2px solid #333;
             border-radius: 5px;
             margin-bottom: 20px;
+            width: 480px;
+            height: 480px;
         }
         .square {
-            width: 60px;
-            height: 60px;
             display: flex;
             justify-content: center;
             align-items: center;
-            font-size: 32px;
+            font-size: 48px;
             cursor: pointer;
             transition: background 0.3s;
         }
-        .light { background: #eee; }
-        .dark { background: #555; color: white; }
+        .light { background: #f0d9a0; }
+        .dark { background: #b58863; }
         .selected { background: #ffeb3b; }
+        .valid-move { background: rgba(0, 255, 0, 0.5); }
+        .invalid-move { background: rgba(255, 0, 0, 0.5); }
         #info {
             font-size: 18px;
+            margin: 20px 0;
+        }
+        #timer {
+            display: flex;
+            justify-content: space-between;
+            width: 300px;
             margin-bottom: 20px;
+        }
+        .timer {
+            font-size: 24px;
+            font-weight: bold;
+            color: #d32f2f;
+        }
+        #reset-button {
+            padding: 10px 20px;
+            font-size: 16px;
+            margin-top: 10px;
+            cursor: pointer;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+        #reset-button:hover {
+            background-color: #0056b3;
+        }
+        #result {
+            font-size: 20px;
+            color: #ff0000;
+            margin-top: 20px;
         }
     </style>
 </head>
 <body>
 
-<h1>Simple Chess Game</h1>
+<h1>Da Duck Chess Game</h1>
+<div id="timer">
+    <div id="white-timer" class="timer">10:00</div>
+    <div id="black-timer" class="timer">10:00</div>
+</div>
 <div id="info">Select a piece to move!</div>
 <div id="board"></div>
+<button id="reset-button">Reset Game</button>
+<div id="result"></div>
 
 <script>
     const boardElement = document.getElementById('board');
     const infoElement = document.getElementById('info');
+    const resetButton = document.getElementById('reset-button');
+    const whiteTimerElement = document.getElementById('white-timer');
+    const blackTimerElement = document.getElementById('black-timer');
+    const resultElement = document.getElementById('result');
     const pieces = {
         r: '♖', n: '♘', b: '♗', q: '♕', k: '♔', p: '♙',
         R: '♜', N: '♞', B: '♟', Q: '♛', K: '♚', P: '♟',
@@ -66,9 +108,16 @@
         'RNBQKBNR'
     ];
 
-    let currentBoard = JSON.parse(JSON.stringify(initialBoard));
+    let currentBoard;
     let selectedSquare = null;
     let whiteToMove = true;
+    let whiteTime = 600; // 10 minutes in seconds
+    let blackTime = 600; // 10 minutes in seconds
+    let timerInterval;
+
+    resetGame(); // Initialize the game
+
+    resetButton.addEventListener('click', resetGame);
 
     function setupBoard() {
         boardElement.innerHTML = '';
@@ -88,21 +137,101 @@
         const square = event.target;
         const position = square.dataset.position;
 
+        if (resultElement.textContent) return; // Do not allow moves after game over
+
         if (selectedSquare) {
             const fromPos = selectedSquare.dataset.position;
             if (makeMove(fromPos, position)) {
                 selectedSquare.classList.remove('selected');
+                clearValidMoves();
                 selectedSquare = null;
                 infoElement.textContent = "Select a piece to move!";
                 whiteToMove = !whiteToMove; // Switch turn
+                updateTimer();
+                if (!whiteToMove) {
+                    setTimeout(() => aiMove(), 1000); // AI makes move after 1 second
+                }
+            } else {
+                // Highlight invalid move
+                square.classList.add('invalid-move');
+                setTimeout(() => {
+                    square.classList.remove('invalid-move');
+                }, 1000);
+                clearValidMoves();
             }
         } else {
             if (isValidSelection(square)) {
                 selectedSquare = square;
                 selectedSquare.classList.add('selected');
+                highlightValidMoves();
                 infoElement.textContent = "Select a destination square!";
             }
         }
+    }
+
+    function highlightValidMoves() {
+        const position = selectedSquare.dataset.position;
+        const piece = currentBoard[position.split('-')[0]][position.split('-')[1]];
+
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                const toPos = `${r}-${c}`;
+                if (isValidMove(position, toPos)) {
+                    const square = document.querySelector(`[data-position="${toPos}"]`);
+                    square.classList.add('valid-move');
+                }
+            }
+        }
+    }
+
+    function clearValidMoves() {
+        const validSquares = document.querySelectorAll('.valid-move');
+        validSquares.forEach(square => square.classList.remove('valid-move'));
+    }
+
+    function resetGame() {
+        clearInterval(timerInterval);
+        currentBoard = JSON.parse(JSON.stringify(initialBoard));
+        selectedSquare = null;
+        whiteToMove = true;
+        whiteTime = 600;
+        blackTime = 600;
+        resultElement.textContent = '';
+        infoElement.textContent = "Select a piece to move!";
+        updateTimerDisplay();
+        setupBoard();
+        startTimer();
+    }
+
+    function startTimer() {
+        timerInterval = setInterval(() => {
+            if (whiteToMove) {
+                whiteTime--;
+                if (whiteTime <= 0) {
+                    clearInterval(timerInterval);
+                    resultElement.textContent = "Black wins by timeout!";
+                }
+                updateTimerDisplay();
+            } else {
+                blackTime--;
+                if (blackTime <= 0) {
+                    clearInterval(timerInterval);
+                    resultElement.textContent = "White wins by timeout!";
+                }
+                updateTimerDisplay();
+            }
+        }, 1000);
+    }
+
+    function updateTimerDisplay() {
+        whiteTimerElement.textContent = formatTime(whiteTime);
+        blackTimerElement.textContent = formatTime(blackTime);
+    }
+
+    function formatTime(seconds) {
+        const minutes = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${minutes < 10 ? '0' : ''}${minutes}:${secs < 10 ? '0' : ''}${secs}`;
     }
 
     function isValidSelection(square) {
@@ -217,6 +346,32 @@
             col += colDirection;
         }
         return true; 
+    }
+
+    function aiMove() {
+        const availableMoves = [];
+        currentBoard.forEach((row, i) => {
+            row.split('').forEach((piece, j) => {
+                if (whiteToMove === (piece === piece.toLowerCase())) {
+                    const fromPos = `${i}-${j}`;
+                    for (let r = 0; r < 8; r++) {
+                        for (let c = 0; c < 8; c++) {
+                            const toPos = `${r}-${c}`;
+                            if (isValidMove(fromPos, toPos)) {
+                                availableMoves.push({ from: fromPos, to: toPos });
+                            }
+                        }
+                    }
+                }
+            });
+        });
+
+        if (availableMoves.length > 0) {
+            const move = availableMoves[Math.floor(Math.random() * availableMoves.length)];
+            makeMove(move.from, move.to);
+            whiteToMove = !whiteToMove;
+            updateTimer();
+        }
     }
 
     setupBoard();
