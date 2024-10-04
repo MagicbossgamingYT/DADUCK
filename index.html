@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Da Duck Chess Game</title>
     <style>
+        /* Add your CSS styles here */
         body {
             display: flex;
             flex-direction: column;
@@ -23,7 +24,6 @@
             margin-bottom: 20px;
             width: 480px;
             height: 480px;
-            position: relative;
         }
         .square {
             display: flex;
@@ -32,43 +32,31 @@
             font-size: 48px;
             cursor: pointer;
             transition: background 0.3s;
-            width: 60px; /* Consistent square size */
-            height: 60px; /* Consistent square size */
+            width: 60px;
+            height: 60px;
         }
         .light { background: #f0d9a0; }
         .dark { background: #b58863; }
         .selected { background: #ffeb3b; }
         .valid-move { background: rgba(0, 255, 0, 0.5); }
         .invalid-move { background: rgba(255, 0, 0, 0.5); }
-        #info {
-            font-size: 18px;
-            margin: 20px 0;
-        }
+        #info { font-size: 18px; margin: 20px 0; }
         #reset-button {
             padding: 10px 20px;
             font-size: 16px;
-            margin-top: 10px;
             cursor: pointer;
             background-color: #007bff;
             color: white;
             border: none;
             border-radius: 5px;
         }
-        #reset-button:hover {
-            background-color: #0056b3;
-        }
-        #result {
-            font-size: 20px;
-            color: #ff0000;
-            margin-top: 20px;
-        }
+        #reset-button:hover { background-color: #0056b3; }
+        #result { font-size: 20px; color: #ff0000; margin-top: 20px; }
         @keyframes moveAnimation {
             from { transform: scale(1); }
             to { transform: scale(1.2); }
         }
-        .moving {
-            animation: moveAnimation 0.3s ease forwards;
-        }
+        .moving { animation: moveAnimation 0.3s ease forwards; }
     </style>
 </head>
 <body>
@@ -105,9 +93,18 @@
     let selectedSquare = null;
     let whiteToMove = true;
 
-    resetGame(); // Initialize the game
+    resetGame();
 
     resetButton.addEventListener('click', resetGame);
+
+    function resetGame() {
+        currentBoard = JSON.parse(JSON.stringify(initialBoard));
+        selectedSquare = null;
+        whiteToMove = true;
+        resultElement.textContent = '';
+        infoElement.textContent = "Select a piece to move!";
+        setupBoard();
+    }
 
     function setupBoard() {
         boardElement.innerHTML = '';
@@ -127,32 +124,22 @@
         const square = event.target;
         const position = square.dataset.position;
 
-        if (resultElement.textContent) return; // Do not allow moves after game over
+        if (resultElement.textContent) return;
 
         if (selectedSquare) {
             const fromPos = selectedSquare.dataset.position;
             if (makeMove(fromPos, position)) {
                 animateMove(fromPos, position);
-                selectedSquare.classList.remove('selected');
-                clearValidMoves();
-                selectedSquare = null;
-                infoElement.textContent = "Select a piece to move!";
-                whiteToMove = !whiteToMove; // Switch turn
-                setTimeout(aiMove, 2000); // AI moves after 2 seconds
+                clearSelection();
+                whiteToMove = !whiteToMove;
+                setTimeout(aiMove, 2000);
             } else {
-                // Highlight invalid move
-                square.classList.add('invalid-move');
-                setTimeout(() => {
-                    square.classList.remove('invalid-move');
-                }, 1000);
+                highlightInvalidMove(square);
                 clearValidMoves();
             }
         } else {
             if (isValidSelection(square)) {
-                selectedSquare = square;
-                selectedSquare.classList.add('selected');
-                highlightValidMoves();
-                infoElement.textContent = "Select a destination square!";
+                selectSquare(square);
             }
         }
     }
@@ -163,72 +150,86 @@
             resultElement.textContent = (whiteToMove ? "Black" : "White") + " wins!";
             return;
         }
-        
-        let bestMove = null;
-        let bestValue = -Infinity;
+        const randomMove = validMoves[Math.floor(Math.random() * validMoves.length)];
+        const fromSquare = document.querySelector(`[data-position="${randomMove.from}"]`);
+        const toSquare = document.querySelector(`[data-position="${randomMove.to}"]`);
 
-        for (const move of validMoves) {
-            const value = minimax(move, 3, -Infinity, Infinity, !whiteToMove);
-            if (value > bestValue) {
-                bestValue = value;
-                bestMove = move;
-            }
-        }
+        makeMove(randomMove.from, randomMove.to);
+        animateMove(randomMove.from, randomMove.to);
 
-        const fromSquare = document.querySelector(`[data-position="${bestMove.from}"]`);
-        const toSquare = document.querySelector(`[data-position="${bestMove.to}"]`);
-
-        makeMove(bestMove.from, bestMove.to);
-        animateMove(bestMove.from, bestMove.to);
-
-        whiteToMove = !whiteToMove; // Switch turn back to player
+        whiteToMove = !whiteToMove;
         infoElement.textContent = "Select a piece to move!";
     }
 
-    function minimax(move, depth, alpha, beta, maximizingPlayer) {
-        if (depth === 0) {
-            return evaluateBoard(currentBoard);
+    function selectSquare(square) {
+        selectedSquare = square;
+        selectedSquare.classList.add('selected');
+        highlightValidMoves();
+        infoElement.textContent = "Select a destination square!";
+    }
+
+    function clearSelection() {
+        if (selectedSquare) {
+            selectedSquare.classList.remove('selected');
+            selectedSquare = null;
+            infoElement.textContent = "Select a piece to move!";
         }
+        clearValidMoves();
+    }
 
-        makeMove(move.from, move.to);
+    function highlightInvalidMove(square) {
+        square.classList.add('invalid-move');
+        setTimeout(() => {
+            square.classList.remove('invalid-move');
+        }, 1000);
+    }
 
-        const validMoves = getAllValidMoves(!maximizingPlayer);
-        if (maximizingPlayer) {
-            let maxEval = -Infinity;
-            for (const nextMove of validMoves) {
-                const eval = minimax(nextMove, depth - 1, alpha, beta, false);
-                maxEval = Math.max(maxEval, eval);
-                alpha = Math.max(alpha, eval);
-                if (beta <= alpha) break; // Alpha-Beta pruning
+    function highlightValidMoves() {
+        const position = selectedSquare.dataset.position;
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                const toPos = `${r}-${c}`;
+                if (isValidMove(position, toPos)) {
+                    const square = document.querySelector(`[data-position="${toPos}"]`);
+                    square.classList.add('valid-move');
+                }
             }
-            undoMove(move.from, move.to);
-            return maxEval;
-        } else {
-            let minEval = Infinity;
-            for (const nextMove of validMoves) {
-                const eval = minimax(nextMove, depth - 1, alpha, beta, true);
-                minEval = Math.min(minEval, eval);
-                beta = Math.min(beta, eval);
-                if (beta <= alpha) break; // Alpha-Beta pruning
-            }
-            undoMove(move.from, move.to);
-            return minEval;
         }
     }
 
-    function evaluateBoard(board) {
-        let score = 0;
-        // Assign values to pieces
-        const pieceValues = {
-            'p': 1, 'r': 5, 'n': 3, 'b': 3, 'q': 9, 'k': 0,
-            'P': -1, 'R': -5, 'N': -3, 'B': -3, 'Q': -9, 'K': 0,
-        };
-        board.forEach(row => {
-            row.split('').forEach(piece => {
-                score += pieceValues[piece] || 0;
-            });
-        });
-        return score;
+    function clearValidMoves() {
+        const validSquares = document.querySelectorAll('.valid-move');
+        validSquares.forEach(square => square.classList.remove('valid-move'));
+    }
+
+    function makeMove(fromPos, toPos) {
+        const fromRow = parseInt(fromPos.split('-')[0]);
+        const fromCol = parseInt(fromPos.split('-')[1]);
+        const toRow = parseInt(toPos.split('-')[0]);
+        const toCol = parseInt(toPos.split('-')[1]);
+
+        const piece = currentBoard[fromRow][fromCol];
+
+        if (isValidMove(fromPos, toPos)) {
+            currentBoard[toRow][toCol] = piece;
+            currentBoard[fromRow][fromCol] = ' ';
+            return true;
+        }
+        return false;
+    }
+
+    function animateMove(fromPos, toPos) {
+        const fromSquare = document.querySelector(`[data-position="${fromPos}"]`);
+        const toSquare = document.querySelector(`[data-position="${toPos}"]`);
+        const piece = fromSquare.textContent;
+
+        fromSquare.textContent = '';
+        toSquare.textContent = piece;
+        toSquare.classList.add('moving');
+
+        setTimeout(() => {
+            toSquare.classList.remove('moving');
+        }, 300);
     }
 
     function getAllValidMoves(isWhite) {
@@ -250,88 +251,23 @@
         return moves;
     }
 
-    function animateMove(fromPos, toPos) {
-        const fromSquare = document.querySelector(`[data-position="${fromPos}"]`);
-        const toSquare = document.querySelector(`[data-position="${toPos}"]`);
-        fromSquare.classList.add('moving');
-        setTimeout(() => {
-            toSquare.innerHTML = fromSquare.innerHTML;
-            fromSquare.innerHTML = '';
-            fromSquare.classList.remove('moving');
-        }, 300);
-    }
-
-    function makeMove(from, to) {
-        const [fromRow, fromCol] = from.split('-').map(Number);
-        const [toRow, toCol] = to.split('-').map(Number);
-        if (isValidMove(from, to)) {
-            currentBoard[toRow] = currentBoard[toRow].substring(0, toCol) +
-                                   currentBoard[fromRow][fromCol] +
-                                   currentBoard[toRow].substring(toCol + 1);
-            currentBoard[fromRow] = currentBoard[fromRow].substring(0, fromCol) +
-                                   ' ' +
-                                   currentBoard[fromRow].substring(fromCol + 1);
-            setupBoard();
-            return true;
-        }
-        return false;
-    }
-
-    function isValidMove(from, to) {
-        // Placeholder logic for move validation
-        const [fromRow, fromCol] = from.split('-').map(Number);
-        const [toRow, toCol] = to.split('-').map(Number);
-        const piece = currentBoard[fromRow][fromCol];
-
-        // Add simple move logic (just for example)
-        if (piece === ' ') return false; // No piece to move
-        if (currentBoard[toRow][toCol] !== ' ' && (isUpperCase(piece) === isUpperCase(currentBoard[toRow][toCol]))) {
-            return false; // Can't capture own piece
-        }
-        return true; // All other moves are considered valid for now
-    }
-
     function isValidSelection(square) {
-        const pos = square.dataset.position;
-        const [row, col] = pos.split('-').map(Number);
-        const piece = currentBoard[row][col];
-        return piece !== ' ' && (whiteToMove ? isUpperCase(piece) : !isUpperCase(piece));
+        const position = square.dataset.position;
+        const piece = currentBoard[position.split('-')[0]][position.split('-')[1]];
+        const isWhitePiece = piece === piece.toUpperCase();
+        return (whiteToMove && isWhitePiece) || (!whiteToMove && piece === piece.toLowerCase());
     }
 
-    function highlightValidMoves() {
-        const position = selectedSquare.dataset.position;
-        const validMoves = getAllValidMoves(whiteToMove);
-        validMoves.forEach(move => {
-            if (move.from === position) {
-                const toSquare = document.querySelector(`[data-position="${move.to}"]`);
-                toSquare.classList.add('valid-move');
-            }
-        });
+    // Remaining validation functions...
+
+    function isValidMove(fromPos, toPos) {
+        // Implement your validation logic here...
     }
 
-    function clearValidMoves() {
-        const validMoves = document.querySelectorAll('.valid-move');
-        validMoves.forEach(square => square.classList.remove('valid-move'));
-    }
-
-    function resetGame() {
-        currentBoard = initialBoard.map(row => row.split('')).map(row => row.join(''));
-        setupBoard();
-        resultElement.textContent = '';
-        infoElement.textContent = "Select a piece to move!";
-        whiteToMove = true;
-        selectedSquare = null;
-    }
-
-    function isUpperCase(char) {
-        return char === char.toUpperCase();
-    }
-
-    function undoMove(from, to) {
-        // This function should undo a move; implement as needed.
-    }
+    // Other helper functions (checkForCheck, isPathClear, piece-specific move validation) go here...
 
     setupBoard();
 </script>
+
 </body>
 </html>
