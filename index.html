@@ -4,25 +4,33 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Da Duck Chess Game</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         body {
             display: flex;
             flex-direction: column;
             align-items: center;
-            font-family: Arial, sans-serif;
-            background: #f4f4f4;
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(to bottom, #f4f4f4, #e0e0e0);
+            height: 100vh;
+            justify-content: center;
+            margin: 0;
         }
         h1 {
             margin-bottom: 20px;
             color: #333;
+            font-size: 2.5em;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
         }
         #board {
             display: grid;
             grid-template-columns: repeat(8, 1fr);
-            border: 2px solid #333;
+            border: 4px solid #444;
             margin-bottom: 20px;
             width: 480px;
             height: 480px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+            border-radius: 8px;
         }
         .square {
             display: flex;
@@ -30,27 +38,32 @@
             align-items: center;
             font-size: 48px;
             cursor: pointer;
-            transition: background 0.3s;
+            transition: background 0.3s, transform 0.3s;
             width: 60px;
             height: 60px;
         }
         .light { background: #f0d9a0; }
         .dark { background: #b58863; }
-        .selected { background: #ffeb3b; }
+        .selected { background: #ffeb3b; transform: scale(1.1); }
         .valid-move { background: rgba(0, 255, 0, 0.5); }
         .invalid-move { background: rgba(255, 0, 0, 0.5); }
-        #info { font-size: 18px; margin: 20px 0; }
+        #info { font-size: 20px; margin: 20px 0; color: #444; }
         #reset-button {
             padding: 10px 20px;
-            font-size: 16px;
+            font-size: 18px;
             cursor: pointer;
             background-color: #007bff;
             color: white;
             border: none;
             border-radius: 5px;
+            transition: background-color 0.3s, transform 0.2s;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
         }
-        #reset-button:hover { background-color: #0056b3; }
-        #result { font-size: 20px; color: #ff0000; margin-top: 20px; }
+        #reset-button:hover { 
+            background-color: #0056b3; 
+            transform: translateY(-2px); 
+        }
+        #result { font-size: 22px; color: #ff0000; margin-top: 20px; }
     </style>
 </head>
 <body>
@@ -58,7 +71,7 @@
 <h1>Da Duck Chess Game</h1>
 <div id="info">Select a piece to move!</div>
 <div id="board"></div>
-<button id="reset-button">Reset Game</button>
+<button id="reset-button"><i class="fas fa-redo"></i> Reset Game</button>
 <div id="result"></div>
 
 <script>
@@ -94,7 +107,6 @@
     function resetGame() {
         currentBoard = JSON.parse(JSON.stringify(initialBoard));
         selectedSquare = null;
-        whiteToMove = true;
         resultElement.textContent = '';
         infoElement.textContent = "Select a piece to move!";
         setupBoard();
@@ -125,10 +137,8 @@
             if (makeMove(fromPos, position)) {
                 clearSelection();
                 whiteToMove = !whiteToMove;
-                infoElement.textContent = "Select a piece to move!";
             } else {
                 highlightInvalidMove(square);
-                clearValidMoves();
             }
         } else {
             if (isValidSelection(square)) {
@@ -140,8 +150,7 @@
     function selectSquare(square) {
         selectedSquare = square;
         selectedSquare.classList.add('selected');
-        highlightValidMoves();
-        infoElement.textContent = "Select a destination square!";
+        infoElement.textContent = "Piece selected. Select a valid move!";
     }
 
     function clearSelection() {
@@ -150,7 +159,6 @@
             selectedSquare = null;
             infoElement.textContent = "Select a piece to move!";
         }
-        clearValidMoves();
     }
 
     function highlightInvalidMove(square) {
@@ -158,24 +166,6 @@
         setTimeout(() => {
             square.classList.remove('invalid-move');
         }, 1000);
-    }
-
-    function highlightValidMoves() {
-        const position = selectedSquare.dataset.position;
-        for (let r = 0; r < 8; r++) {
-            for (let c = 0; c < 8; c++) {
-                const toPos = `${r}-${c}`;
-                if (isValidMove(position, toPos)) {
-                    const square = document.querySelector(`[data-position="${toPos}"]`);
-                    square.classList.add('valid-move');
-                }
-            }
-        }
-    }
-
-    function clearValidMoves() {
-        const validSquares = document.querySelectorAll('.valid-move');
-        validSquares.forEach(square => square.classList.remove('valid-move'));
     }
 
     function makeMove(fromPos, toPos) {
@@ -186,12 +176,14 @@
 
         const piece = currentBoard[fromRow][fromCol];
 
-        if (isValidMove(fromPos, toPos)) {
-            currentBoard[toRow][toCol] = piece;
-            currentBoard[fromRow][fromCol] = ' ';
-            return true;
-        }
-        return false;
+        // Check for valid move logic based on piece type
+        if (!isValidMove(piece, fromPos, toPos)) return false;
+
+        // Make the move
+        currentBoard[toRow][toCol] = piece;
+        currentBoard[fromRow][fromCol] = ' ';
+        setupBoard(); // Refresh the board display
+        return true;
     }
 
     function isValidSelection(square) {
@@ -201,64 +193,54 @@
         return (whiteToMove && isWhitePiece) || (!whiteToMove && piece === piece.toLowerCase());
     }
 
-    function isValidMove(fromPos, toPos) {
-        const fromRow = parseInt(fromPos.split('-')[0]);
-        const fromCol = parseInt(fromPos.split('-')[1]);
-        const toRow = parseInt(toPos.split('-')[0]);
-        const toCol = parseInt(toPos.split('-')[1]);
+    function isValidMove(piece, fromPos, toPos) {
+        const [fromRow, fromCol] = fromPos.split('-').map(Number);
+        const [toRow, toCol] = toPos.split('-').map(Number);
+        
+        const deltaRow = toRow - fromRow;
+        const deltaCol = toCol - fromCol;
 
-        const piece = currentBoard[fromRow][fromCol];
-        const targetPiece = currentBoard[toRow][toCol];
-
-        if (fromRow === toRow && fromCol === toCol) return false; // Can't move to the same square
-
-        // Basic movement rules for pawns
-        if (piece.toLowerCase() === 'p') { // Pawn
-            const direction = piece === 'P' ? -1 : 1; // White moves up, black moves down
-            const startRow = piece === 'P' ? 6 : 1; // Starting row for pawns
-            if (fromCol === toCol) { // Moving straight
-                if (targetPiece === ' ' && toRow === fromRow + direction) return true; // Move one
-                if (targetPiece === ' ' && fromRow === startRow && toRow === fromRow + 2 * direction) return true; // Move two
-            } else if (Math.abs(fromCol - toCol) === 1 && toRow === fromRow + direction) { // Capturing
-                return targetPiece !== ' ' && (targetPiece === targetPiece.toLowerCase() !== (piece === piece.toUpperCase()));
-            }
-            return false;
+        switch (piece.toLowerCase()) {
+            case 'p': // Pawn
+                if (whiteToMove) {
+                    return (deltaCol === 0 && deltaRow === -1 && currentBoard[toRow][toCol] === ' ') || // Normal move
+                           (deltaCol === 0 && deltaRow === -2 && fromRow === 6 && currentBoard[toRow][toCol] === ' ' && currentBoard[fromRow - 1][fromCol] === ' ') || // Initial double move
+                           (Math.abs(deltaCol) === 1 && deltaRow === -1 && currentBoard[toRow][toCol] !== ' ' && currentBoard[toRow][toCol].toLowerCase() !== piece); // Capture
+                } else {
+                    return (deltaCol === 0 && deltaRow === 1 && currentBoard[toRow][toCol] === ' ') || // Normal move
+                           (deltaCol === 0 && deltaRow === 2 && fromRow === 1 && currentBoard[toRow][toCol] === ' ' && currentBoard[fromRow + 1][fromCol] === ' ') || // Initial double move
+                           (Math.abs(deltaCol) === 1 && deltaRow === 1 && currentBoard[toRow][toCol] !== ' ' && currentBoard[toRow][toCol].toUpperCase() !== piece); // Capture
+                }
+            case 'r': // Rook
+                return (deltaRow === 0 || deltaCol === 0) && isPathClear(fromRow, fromCol, toRow, toCol);
+            case 'n': // Knight
+                return (Math.abs(deltaRow) === 2 && Math.abs(deltaCol) === 1) || (Math.abs(deltaRow) === 1 && Math.abs(deltaCol) === 2);
+            case 'b': // Bishop
+                return Math.abs(deltaRow) === Math.abs(deltaCol) && isPathClear(fromRow, fromCol, toRow, toCol);
+            case 'q': // Queen
+                return (deltaRow === 0 || deltaCol === 0 || Math.abs(deltaRow) === Math.abs(deltaCol)) && isPathClear(fromRow, fromCol, toRow, toCol);
+            case 'k': // King
+                return (Math.abs(deltaRow) <= 1 && Math.abs(deltaCol) <= 1);
+            default:
+                return false;
         }
-
-        // Implement rules for other pieces (simplified)
-        if (piece.toLowerCase() === 'r') { // Rook
-            if (fromRow === toRow || fromCol === toCol) return isPathClear(fromRow, fromCol, toRow, toCol);
-        } else if (piece.toLowerCase() === 'n') { // Knight
-            const rowDiff = Math.abs(fromRow - toRow);
-            const colDiff = Math.abs(fromCol - toCol);
-            if ((rowDiff === 2 && colDiff === 1) || (rowDiff === 1 && colDiff === 2)) return true;
-        } else if (piece.toLowerCase() === 'b') { // Bishop
-            if (Math.abs(fromRow - toRow) === Math.abs(fromCol - toCol)) return isPathClear(fromRow, fromCol, toRow, toCol);
-        } else if (piece.toLowerCase() === 'q') { // Queen
-            if (fromRow === toRow || fromCol === toCol || Math.abs(fromRow - toRow) === Math.abs(fromCol - toCol)) {
-                return isPathClear(fromRow, fromCol, toRow, toCol);
-            }
-        } else if (piece.toLowerCase() === 'k') { // King
-            const rowDiff = Math.abs(fromRow - toRow);
-            const colDiff = Math.abs(fromCol - toCol);
-            if (rowDiff <= 1 && colDiff <= 1) return true;
-        }
-
-        return false; // Default case, invalid move
     }
 
     function isPathClear(fromRow, fromCol, toRow, toCol) {
-        const rowStep = Math.sign(toRow - fromRow);
-        const colStep = Math.sign(toCol - fromCol);
-        let r = fromRow + rowStep;
-        let c = fromCol + colStep;
+        const deltaRow = toRow - fromRow;
+        const deltaCol = toCol - fromCol;
+        const stepRow = deltaRow === 0 ? 0 : deltaRow > 0 ? 1 : -1;
+        const stepCol = deltaCol === 0 ? 0 : deltaCol > 0 ? 1 : -1;
 
-        while (r !== toRow || c !== toCol) {
-            if (currentBoard[r][c] !== ' ') return false; // Path is blocked
-            r += rowStep;
-            c += colStep;
+        let row = fromRow + stepRow;
+        let col = fromCol + stepCol;
+
+        while (row !== toRow || col !== toCol) {
+            if (currentBoard[row][col] !== ' ') return false;
+            row += stepRow;
+            col += stepCol;
         }
-        return true; // Path is clear
+        return true;
     }
 
     setupBoard();
