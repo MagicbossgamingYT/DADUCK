@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Da Duck Chess Game</title>
     <style>
-        /* Add your CSS styles here */
         body {
             display: flex;
             flex-direction: column;
             align-items: center;
             font-family: Arial, sans-serif;
             background: #f4f4f4;
+            padding: 20px;
         }
         h1 {
             margin-bottom: 20px;
@@ -49,9 +49,31 @@
             color: white;
             border: none;
             border-radius: 5px;
+            margin-bottom: 20px;
         }
         #reset-button:hover { background-color: #0056b3; }
         #result { font-size: 20px; color: #ff0000; margin-top: 20px; }
+        #instructions {
+            margin: 20px 0;
+            max-width: 600px;
+            text-align: left;
+        }
+        footer {
+            margin-top: 20px;
+            font-size: 14px;
+            color: #666;
+        }
+        @media (max-width: 600px) {
+            #board {
+                width: 100%;
+                height: auto;
+            }
+            .square {
+                width: 12.5vw;
+                height: 12.5vw;
+                font-size: 5vw;
+            }
+        }
         @keyframes moveAnimation {
             from { transform: scale(1); }
             to { transform: scale(1.2); }
@@ -66,6 +88,20 @@
 <div id="board"></div>
 <button id="reset-button">Reset Game</button>
 <div id="result"></div>
+<div id="instructions">
+    <h2>How to Play</h2>
+    <p>Welcome to Da Duck Chess! Here are the basic rules:</p>
+    <ul>
+        <li>Each player starts with 16 pieces: 1 king, 1 queen, 2 rooks, 2 knights, 2 bishops, and 8 pawns.</li>
+        <li>The goal is to checkmate your opponent's king, putting it in a position where it cannot escape capture.</li>
+        <li>Players take turns moving one piece at a time.</li>
+        <li>Each type of piece has its own movement rules.</li>
+        <li>For detailed rules, consider looking up chess guides online.</li>
+    </ul>
+</div>
+<footer>
+    <p>&copy; 2024 Da Duck Chess. All rights reserved.</p>
+</footer>
 
 <script>
     const boardElement = document.getElementById('board');
@@ -131,6 +167,11 @@
             if (makeMove(fromPos, position)) {
                 animateMove(fromPos, position);
                 clearSelection();
+                if (isInCheck(!whiteToMove)) {
+                    resultElement.textContent = (whiteToMove ? "White" : "Black") + " is in check!";
+                } else if (isCheckmate(!whiteToMove)) {
+                    resultElement.textContent = (whiteToMove ? "Black" : "White") + " wins by checkmate!";
+                }
                 whiteToMove = !whiteToMove;
                 setTimeout(aiMove, 2000);
             } else {
@@ -147,7 +188,7 @@
     function aiMove() {
         const validMoves = getAllValidMoves(!whiteToMove);
         if (validMoves.length === 0) {
-            resultElement.textContent = (whiteToMove ? "Black" : "White") + " wins!";
+            resultElement.textContent = (whiteToMove ? "Black" : "White") + " wins by stalemate!";
             return;
         }
         const randomMove = validMoves[Math.floor(Math.random() * validMoves.length)];
@@ -156,6 +197,12 @@
 
         makeMove(randomMove.from, randomMove.to);
         animateMove(randomMove.from, randomMove.to);
+
+        if (isInCheck(whiteToMove)) {
+            resultElement.textContent = (whiteToMove ? "White" : "Black") + " is in check!";
+        } else if (isCheckmate(whiteToMove)) {
+            resultElement.textContent = (whiteToMove ? "Black" : "White") + " wins by checkmate!";
+        }
 
         whiteToMove = !whiteToMove;
         infoElement.textContent = "Select a piece to move!";
@@ -258,13 +305,96 @@
         return (whiteToMove && isWhitePiece) || (!whiteToMove && piece === piece.toLowerCase());
     }
 
-    // Remaining validation functions...
-
     function isValidMove(fromPos, toPos) {
-        // Implement your validation logic here...
+        const fromRow = parseInt(fromPos.split('-')[0]);
+        const fromCol = parseInt(fromPos.split('-')[1]);
+        const toRow = parseInt(toPos.split('-')[0]);
+        const toCol = parseInt(toPos.split('-')[1]);
+
+        const piece = currentBoard[fromRow][fromCol];
+        const targetPiece = currentBoard[toRow][toCol];
+
+        if (fromRow === toRow && fromCol === toCol) return false; // Can't move to the same square
+
+        // Basic movement rules (no check/checkmate, etc.)
+        if (piece.toLowerCase() === 'p') { // Pawn
+            if (piece === 'P') {
+                return (fromRow - toRow === 1 && fromCol === toCol && !targetPiece) || // Move forward
+                       (fromRow - toRow === 1 && Math.abs(fromCol - toCol) === 1 && targetPiece && targetPiece.toLowerCase() === 'p'); // Capture
+            } else {
+                return (toRow - fromRow === 1 && fromCol === toCol && !targetPiece) || // Move forward
+                       (toRow - fromRow === 1 && Math.abs(fromCol - toCol) === 1 && targetPiece && targetPiece && targetPiece.toUpperCase() === 'P'); // Capture
+            }
+        } else if (piece.toLowerCase() === 'r') { // Rook
+            return (fromRow === toRow || fromCol === toCol) && isPathClear(fromPos, toPos);
+        } else if (piece.toLowerCase() === 'n') { // Knight
+            const rowDiff = Math.abs(fromRow - toRow);
+            const colDiff = Math.abs(fromCol - toCol);
+            return (rowDiff === 2 && colDiff === 1) || (rowDiff === 1 && colDiff === 2); // L-shaped moves
+        } else if (piece.toLowerCase() === 'b') { // Bishop
+            return Math.abs(fromRow - toRow) === Math.abs(fromCol - toCol) && isPathClear(fromPos, toPos); // Diagonal moves
+        } else if (piece.toLowerCase() === 'q') { // Queen
+            return (fromRow === toRow || fromCol === toCol || Math.abs(fromRow - toRow) === Math.abs(fromCol - toCol)) && isPathClear(fromPos, toPos); // Straight or diagonal
+        } else if (piece.toLowerCase() === 'k') { // King
+            return Math.abs(fromRow - toRow) <= 1 && Math.abs(fromCol - toCol) <= 1; // One square in any direction
+        }
+        
+        return false;
     }
 
-    // Other helper functions (checkForCheck, isPathClear, piece-specific move validation) go here...
+    function isPathClear(fromPos, toPos) {
+        const fromRow = parseInt(fromPos.split('-')[0]);
+        const fromCol = parseInt(fromPos.split('-')[1]);
+        const toRow = parseInt(toPos.split('-')[0]);
+        const toCol = parseInt(toPos.split('-')[1]);
+
+        const rowStep = (toRow - fromRow) === 0 ? 0 : (toRow - fromRow) / Math.abs(toRow - fromRow);
+        const colStep = (toCol - fromCol) === 0 ? 0 : (toCol - fromCol) / Math.abs(toCol - fromCol);
+
+        let row = fromRow + rowStep;
+        let col = fromCol + colStep;
+        while (row !== toRow || col !== toCol) {
+            if (currentBoard[row][col] !== ' ') {
+                return false; // Path is blocked
+            }
+            row += rowStep;
+            col += colStep;
+        }
+        return true;
+    }
+
+    function isInCheck(isWhite) {
+        const kingPos = findKing(isWhite);
+        return isAttacked(kingPos, !isWhite);
+    }
+
+    function isAttacked(kingPos, attackingColor) {
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                const piece = currentBoard[r][c];
+                if ((attackingColor ? piece === piece.toLowerCase() : piece === piece.toUpperCase()) && isValidMove(`${r}-${c}`, kingPos)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    function findKing(isWhite) {
+        const kingChar = isWhite ? 'K' : 'k';
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                if (currentBoard[r][c] === kingChar) {
+                    return `${r}-${c}`;
+                }
+            }
+        }
+    }
+
+    function isCheckmate(isWhite) {
+        const validMoves = getAllValidMoves(isWhite);
+        return validMoves.length === 0 && isInCheck(isWhite);
+    }
 
     setupBoard();
 </script>
