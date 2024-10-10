@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Da Duck Chess Game</title>
+    <title>Chess Game with AI</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         body {
@@ -39,8 +39,6 @@
             font-size: 48px;
             cursor: pointer;
             transition: background 0.3s, transform 0.3s;
-            width: 60px;
-            height: 60px;
         }
         .light { background: #f0d9a0; }
         .dark { background: #b58863; }
@@ -48,6 +46,22 @@
         .valid-move { background: rgba(0, 255, 0, 0.5); }
         .invalid-move { background: rgba(255, 0, 0, 0.5); }
         #info { font-size: 20px; margin: 20px 0; color: #444; }
+        #turn-indicator {
+            font-size: 22px; 
+            color: #007bff; 
+            margin-bottom: 10px; 
+        }
+        #move-history {
+            font-size: 16px; 
+            color: #555; 
+            margin-top: 20px; 
+            max-height: 150px; 
+            overflow-y: auto; 
+            width: 480px; 
+            border: 1px solid #ccc; 
+            padding: 10px; 
+            border-radius: 5px;
+        }
         #reset-button {
             padding: 10px 20px;
             font-size: 18px;
@@ -68,17 +82,21 @@
 </head>
 <body>
 
-<h1>Da Duck Chess Game</h1>
+<h1>Chess Game with AI</h1>
 <div id="info">Select a piece to move!</div>
+<div id="turn-indicator">Current Turn: White</div>
 <div id="board"></div>
 <button id="reset-button"><i class="fas fa-redo"></i> Reset Game</button>
 <div id="result"></div>
+<div id="move-history"></div>
 
 <script>
     const boardElement = document.getElementById('board');
     const infoElement = document.getElementById('info');
     const resetButton = document.getElementById('reset-button');
     const resultElement = document.getElementById('result');
+    const turnIndicator = document.getElementById('turn-indicator');
+    const moveHistoryElement = document.getElementById('move-history');
 
     const pieces = {
         r: '♖', n: '♘', b: '♗', q: '♕', k: '♔', p: '♙',
@@ -99,6 +117,8 @@
     let currentBoard;
     let selectedSquare = null;
     let whiteToMove = true;
+    let moveHistory = [];
+    let openingMoves = [];
 
     resetGame();
 
@@ -110,6 +130,9 @@
         resultElement.textContent = '';
         infoElement.textContent = "Select a piece to move!";
         setupBoard();
+        updateTurnIndicator();
+        moveHistory = []; // Reset move history
+        updateMoveHistory();
     }
 
     function setupBoard() {
@@ -135,8 +158,14 @@
         if (selectedSquare) {
             const fromPos = selectedSquare.dataset.position;
             if (makeMove(fromPos, position)) {
+                logMove(fromPos, position);
+                analyzeOpening(fromPos, position);
                 clearSelection();
                 whiteToMove = !whiteToMove;
+                updateTurnIndicator();
+                if (!whiteToMove) {
+                    setTimeout(aiMove, 500); // AI turn
+                }
             } else {
                 highlightInvalidMove(square);
             }
@@ -145,6 +174,14 @@
                 selectSquare(square);
             }
         }
+    }
+
+    function updateTurnIndicator() {
+        turnIndicator.textContent = `Current Turn: ${whiteToMove ? 'White' : 'Black'}`;
+    }
+
+    function updateMoveHistory() {
+        moveHistoryElement.innerHTML = moveHistory.map(move => `<div>${move}</div>`).join('');
     }
 
     function selectSquare(square) {
@@ -176,14 +213,39 @@
 
         const piece = currentBoard[fromRow][fromCol];
 
-        // Check for valid move logic based on piece type
         if (!isValidMove(piece, fromPos, toPos)) return false;
 
-        // Make the move
         currentBoard[toRow][toCol] = piece;
         currentBoard[fromRow][fromCol] = ' ';
         setupBoard(); // Refresh the board display
         return true;
+    }
+
+    function logMove(fromPos, toPos) {
+        const movedPiece = currentBoard[fromPos.split('-')[0]][fromPos.split('-')[1]];
+        const moveNotation = `${pieces[movedPiece]} from ${fromPos} to ${toPos}`;
+        moveHistory.push(moveNotation);
+        updateMoveHistory();
+    }
+
+    function analyzeOpening(fromPos, toPos) {
+        openingMoves.push({ from: fromPos, to: toPos });
+        // Basic opening recognition
+        if (openingMoves.length === 1) {
+            if (fromPos === '6-4' && toPos === '5-4') { // e4
+                aiMove('e4');
+            }
+            // Add more openings as needed
+        }
+    }
+
+    function aiMove(opening) {
+        if (opening === 'e4') {
+            makeMove('1-4', '2-4'); // AI plays e5
+            logMove('1-4', '2-4'); // Log AI move
+            updateMoveHistory(); // Update move history
+            updateTurnIndicator(); // Update turn indicator
+        }
     }
 
     function isValidSelection(square) {
@@ -203,13 +265,13 @@
         switch (piece.toLowerCase()) {
             case 'p': // Pawn
                 if (whiteToMove) {
-                    return (deltaCol === 0 && deltaRow === -1 && currentBoard[toRow][toCol] === ' ') || // Normal move
-                           (deltaCol === 0 && deltaRow === -2 && fromRow === 6 && currentBoard[toRow][toCol] === ' ' && currentBoard[fromRow - 1][fromCol] === ' ') || // Initial double move
-                           (Math.abs(deltaCol) === 1 && deltaRow === -1 && currentBoard[toRow][toCol] !== ' ' && currentBoard[toRow][toCol].toLowerCase() !== piece); // Capture
+                    return (deltaCol === 0 && deltaRow === -1 && currentBoard[toRow][toCol] === ' ') ||
+                           (deltaCol === 0 && deltaRow === -2 && fromRow === 6 && currentBoard[toRow][toCol] === ' ' && currentBoard[fromRow - 1][fromCol] === ' ') ||
+                           (Math.abs(deltaCol) === 1 && deltaRow === -1 && currentBoard[toRow][toCol] !== ' ' && currentBoard[toRow][toCol].toLowerCase() !== piece);
                 } else {
-                    return (deltaCol === 0 && deltaRow === 1 && currentBoard[toRow][toCol] === ' ') || // Normal move
-                           (deltaCol === 0 && deltaRow === 2 && fromRow === 1 && currentBoard[toRow][toCol] === ' ' && currentBoard[fromRow + 1][fromCol] === ' ') || // Initial double move
-                           (Math.abs(deltaCol) === 1 && deltaRow === 1 && currentBoard[toRow][toCol] !== ' ' && currentBoard[toRow][toCol].toUpperCase() !== piece); // Capture
+                    return (deltaCol === 0 && deltaRow === 1 && currentBoard[toRow][toCol] === ' ') ||
+                           (deltaCol === 0 && deltaRow === 2 && fromRow === 1 && currentBoard[toRow][toCol] === ' ' && currentBoard[fromRow + 1][fromCol] === ' ') ||
+                           (Math.abs(deltaCol) === 1 && deltaRow === 1 && currentBoard[toRow][toCol] !== ' ' && currentBoard[toRow][toCol].toUpperCase() !== piece);
                 }
             case 'r': // Rook
                 return (deltaRow === 0 || deltaCol === 0) && isPathClear(fromRow, fromCol, toRow, toCol);
