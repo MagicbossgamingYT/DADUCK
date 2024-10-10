@@ -79,7 +79,6 @@
             background-color: #0056b3; 
             transform: translateY(-2px); 
         }
-        #result { font-size: 22px; color: #ff0000; margin-top: 20px; }
     </style>
 </head>
 <body>
@@ -89,14 +88,12 @@
 <div id="turn-indicator">Current Turn: White</div>
 <div id="board"></div>
 <button id="reset-button"><i class="fas fa-redo"></i> Reset Game</button>
-<div id="result"></div>
 <div id="move-history"></div>
 
 <script>
     const boardElement = document.getElementById('board');
     const infoElement = document.getElementById('info');
     const resetButton = document.getElementById('reset-button');
-    const resultElement = document.getElementById('result');
     const turnIndicator = document.getElementById('turn-indicator');
     const moveHistoryElement = document.getElementById('move-history');
 
@@ -120,7 +117,6 @@
     let selectedSquare = null;
     let whiteToMove = true;
     let moveHistory = [];
-    let openingMoves = [];
 
     resetGame();
 
@@ -129,7 +125,6 @@
     function resetGame() {
         currentBoard = JSON.parse(JSON.stringify(initialBoard));
         selectedSquare = null;
-        resultElement.textContent = '';
         infoElement.textContent = "Select a piece to move!";
         setupBoard();
         updateTurnIndicator();
@@ -155,19 +150,13 @@
         const square = event.target;
         const position = square.dataset.position;
 
-        if (resultElement.textContent) return;
-
         if (selectedSquare) {
             const fromPos = selectedSquare.dataset.position;
             if (makeMove(fromPos, position)) {
                 logMove(fromPos, position);
-                analyzeOpening(fromPos, position);
                 clearSelection();
                 whiteToMove = !whiteToMove;
                 updateTurnIndicator();
-                if (!whiteToMove) {
-                    setTimeout(aiMove, 500);
-                }
             } else {
                 highlightInvalidMove(square);
             }
@@ -228,24 +217,6 @@
         const moveNotation = `${pieces[movedPiece]} from ${fromPos} to ${toPos}`;
         moveHistory.push(moveNotation);
         updateMoveHistory();
-    }
-
-    function analyzeOpening(fromPos, toPos) {
-        openingMoves.push({ from: fromPos, to: toPos });
-        if (openingMoves.length === 1) {
-            if (fromPos === '6-4' && toPos === '5-4') {
-                aiMove('e4');
-            }
-        }
-    }
-
-    function aiMove(opening) {
-        if (opening === 'e4') {
-            makeMove('1-4', '2-4'); // AI plays e5
-            logMove('1-4', '2-4');
-            updateMoveHistory();
-            updateTurnIndicator();
-        }
     }
 
     function isValidSelection(square) {
@@ -310,3 +281,4 @@
 
 </body>
 </html>
+
