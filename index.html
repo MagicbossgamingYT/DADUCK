@@ -79,6 +79,11 @@
             background-color: #0056b3; 
             transform: translateY(-2px); 
         }
+        #result {
+            font-size: 22px; 
+            color: #ff0000; 
+            margin-top: 20px; 
+        }
     </style>
 </head>
 <body>
@@ -89,6 +94,7 @@
 <div id="board"></div>
 <button id="reset-button"><i class="fas fa-redo"></i> Reset Game</button>
 <div id="move-history"></div>
+<div id="result"></div>
 
 <script>
     const boardElement = document.getElementById('board');
@@ -96,6 +102,7 @@
     const resetButton = document.getElementById('reset-button');
     const turnIndicator = document.getElementById('turn-indicator');
     const moveHistoryElement = document.getElementById('move-history');
+    const resultElement = document.getElementById('result');
 
     const pieces = {
         r: '♖', n: '♘', b: '♗', q: '♕', k: '♔', p: '♙',
@@ -103,14 +110,14 @@
     };
 
     const initialBoard = [
-        'rnbqkbnr',
-        'pppppppp',
-        '        ',
-        '        ',
-        '        ',
-        '        ',
+        'RNBQKBNR',
         'PPPPPPPP',
-        'RNBQKBNR'
+        '        ',
+        '        ',
+        '        ',
+        '        ',
+        'pppppppp',
+        'rnbqkbnr'
     ];
 
     let currentBoard;
@@ -126,8 +133,9 @@
         currentBoard = JSON.parse(JSON.stringify(initialBoard));
         selectedSquare = null;
         infoElement.textContent = "Select a piece to move!";
+        turnIndicator.textContent = "Current Turn: White";
+        resultElement.textContent = '';
         setupBoard();
-        updateTurnIndicator();
         moveHistory = [];
         updateMoveHistory();
     }
@@ -157,6 +165,7 @@
                 clearSelection();
                 whiteToMove = !whiteToMove;
                 updateTurnIndicator();
+                checkGameStatus();
             } else {
                 highlightInvalidMove(square);
             }
@@ -165,14 +174,6 @@
                 selectSquare(square);
             }
         }
-    }
-
-    function updateTurnIndicator() {
-        turnIndicator.textContent = `Current Turn: ${whiteToMove ? 'White' : 'Black'}`;
-    }
-
-    function updateMoveHistory() {
-        moveHistoryElement.innerHTML = moveHistory.map(move => `<div>${move}</div>`).join('');
     }
 
     function selectSquare(square) {
@@ -208,15 +209,22 @@
 
         currentBoard[toRow][toCol] = piece;
         currentBoard[fromRow][fromCol] = ' ';
-        setupBoard();
+        setupBoard(); // Refresh the board display
         return true;
     }
 
     function logMove(fromPos, toPos) {
-        const movedPiece = currentBoard[fromPos.split('-')[0]][fromPos.split('-')[1]];
-        const moveNotation = `${pieces[movedPiece]} from ${fromPos} to ${toPos}`;
-        moveHistory.push(moveNotation);
+        const move = `${currentBoard[fromPos.split('-')[0]][fromPos.split('-')[1]]} from ${fromPos} to ${toPos}`;
+        moveHistory.push(move);
         updateMoveHistory();
+    }
+
+    function updateMoveHistory() {
+        moveHistoryElement.innerHTML = moveHistory.join('<br/>');
+    }
+
+    function updateTurnIndicator() {
+        turnIndicator.textContent = `Current Turn: ${whiteToMove ? 'White' : 'Black'}`;
     }
 
     function isValidSelection(square) {
@@ -236,12 +244,12 @@
         switch (piece.toLowerCase()) {
             case 'p': // Pawn
                 if (whiteToMove) {
-                    return (deltaCol === 0 && deltaRow === -1 && currentBoard[toRow][toCol] === ' ') ||
-                           (deltaCol === 0 && deltaRow === -2 && fromRow === 6 && currentBoard[toRow][toCol] === ' ' && currentBoard[fromRow - 1][fromCol] === ' ') ||
+                    return (deltaCol === 0 && deltaRow === -1 && currentBoard[toRow][toCol] === ' ') || 
+                           (deltaCol === 0 && deltaRow === -2 && fromRow === 6 && currentBoard[toRow][toCol] === ' ' && currentBoard[fromRow - 1][fromCol] === ' ') || 
                            (Math.abs(deltaCol) === 1 && deltaRow === -1 && currentBoard[toRow][toCol] !== ' ' && currentBoard[toRow][toCol].toLowerCase() !== piece);
                 } else {
-                    return (deltaCol === 0 && deltaRow === 1 && currentBoard[toRow][toCol] === ' ') ||
-                           (deltaCol === 0 && deltaRow === 2 && fromRow === 1 && currentBoard[toRow][toCol] === ' ' && currentBoard[fromRow + 1][fromCol] === ' ') ||
+                    return (deltaCol === 0 && deltaRow === 1 && currentBoard[toRow][toCol] === ' ') || 
+                           (deltaCol === 0 && deltaRow === 2 && fromRow === 1 && currentBoard[toRow][toCol] === ' ' && currentBoard[fromRow + 1][fromCol] === ' ') || 
                            (Math.abs(deltaCol) === 1 && deltaRow === 1 && currentBoard[toRow][toCol] !== ' ' && currentBoard[toRow][toCol].toUpperCase() !== piece);
                 }
             case 'r': // Rook
@@ -276,9 +284,46 @@
         return true;
     }
 
+    function checkGameStatus() {
+        if (isInCheck()) {
+            resultElement.textContent = whiteToMove ? 'Black is in check!' : 'White is in check!';
+        }
+        // Additional checks for checkmate or stalemate can be implemented here
+    }
+
+    function isInCheck() {
+        // Simplified check logic; this would need to be expanded for full functionality
+        const kingRow = whiteToMove ? findKing('K') : findKing('k');
+        const opponentPieces = whiteToMove ? 'rnbqpn' : 'RNBQPN';
+
+        for (let i = 0; i < 8; i++) {
+            for (let j = 0; j < 8; j++) {
+                const piece = currentBoard[i][j];
+                if (opponentPieces.includes(piece)) {
+                    const fromPos = `${i}-${j}`;
+                    const toPos = `${kingRow[0]}-${kingRow[1]}`;
+                    if (isValidMove(piece, fromPos, toPos)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    function findKing(king) {
+        for (let i = 0; i < 8; i++) {
+            for (let j = 0; j < 8; j++) {
+                if (currentBoard[i][j] === king) {
+                    return [i, j];
+                }
+            }
+        }
+        return null;
+    }
+
     setupBoard();
 </script>
 
 </body>
 </html>
-
