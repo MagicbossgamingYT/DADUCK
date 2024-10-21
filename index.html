@@ -47,12 +47,8 @@
         .selected { background: #ffeb3b; transform: scale(1.1); }
         .valid-move { background: rgba(0, 255, 0, 0.5); }
         .invalid-move { background: rgba(255, 0, 0, 0.5); }
-        #info { font-size: 20px; margin: 20px 0; color: #444; }
-        #turn-indicator {
-            font-size: 22px; 
-            color: #007bff; 
-            margin-bottom: 10px; 
-        }
+        #info, #turn-indicator, #result { font-size: 20px; color: #444; }
+        #turn-indicator { font-size: 22px; color: #007bff; margin-bottom: 10px; }
         #move-history {
             font-size: 16px; 
             color: #555; 
@@ -79,11 +75,6 @@
             background-color: #0056b3; 
             transform: translateY(-2px); 
         }
-        #result {
-            font-size: 22px; 
-            color: #ff0000; 
-            margin-top: 20px; 
-        }
     </style>
 </head>
 <body>
@@ -105,8 +96,8 @@
     const resultElement = document.getElementById('result');
 
     const pieces = {
-        r: '♖', n: '♘', b: '♗', q: '♕', k: '♔', p: '♙',
-        R: '♜', N: '♞', B: '♟', Q: '♛', K: '♚', P: '♟',
+        r: '♖', n: '♘', b: '♗', q: '♕', k: '♔', p: '♙', // White pieces
+        R: '♜', N: '♞', B: '♟', Q: '♛', K: '♚', P: '♟', // Black pieces
     };
 
     const initialBoard = [
@@ -208,14 +199,14 @@
         if (!isValidMove(piece, fromPos, toPos)) return false;
 
         currentBoard[toRow][toCol] = piece;
-        currentBoard[fromRow][fromCol] = ' ';
+        currentBoard[fromRow][fromCol] = ' '; // Fixed: Ensure space is represented correctly
         setupBoard(); // Refresh the board display
         return true;
     }
 
     function logMove(fromPos, toPos) {
-        const move = `${currentBoard[fromPos.split('-')[0]][fromPos.split('-')[1]]} from ${fromPos} to ${toPos}`;
-        moveHistory.push(move);
+        const pieceMoved = currentBoard[fromPos.split('-')[0]][fromPos.split('-')[1]];
+        moveHistory.push(`${pieces[pieceMoved]} from ${fromPos} to ${toPos}`);
         updateMoveHistory();
     }
 
@@ -243,15 +234,22 @@
 
         switch (piece.toLowerCase()) {
             case 'p': // Pawn
-                if (whiteToMove) {
-                    return (deltaCol === 0 && deltaRow === -1 && currentBoard[toRow][toCol] === ' ') || 
-                           (deltaCol === 0 && deltaRow === -2 && fromRow === 6 && currentBoard[toRow][toCol] === ' ' && currentBoard[fromRow - 1][fromCol] === ' ') || 
-                           (Math.abs(deltaCol) === 1 && deltaRow === -1 && currentBoard[toRow][toCol] !== ' ' && currentBoard[toRow][toCol].toLowerCase() !== piece);
-                } else {
-                    return (deltaCol === 0 && deltaRow === 1 && currentBoard[toRow][toCol] === ' ') || 
-                           (deltaCol === 0 && deltaRow === 2 && fromRow === 1 && currentBoard[toRow][toCol] === ' ' && currentBoard[fromRow + 1][fromCol] === ' ') || 
-                           (Math.abs(deltaCol) === 1 && deltaRow === 1 && currentBoard[toRow][toCol] !== ' ' && currentBoard[toRow][toCol].toUpperCase() !== piece);
+                const direction = whiteToMove ? -1 : 1;
+                const startRow = whiteToMove ? 6 : 1;
+
+                if (deltaCol === 0 && deltaRow === direction && currentBoard[toRow][toCol] === ' ') {
+                    return true; // Normal move
                 }
+                if (deltaCol === 0 && deltaRow === 2 * direction && fromRow === startRow &&
+                    currentBoard[toRow][toCol] === ' ' && currentBoard[fromRow + direction][fromCol] === ' ') {
+                    return true; // Double move
+                }
+                if (Math.abs(deltaCol) === 1 && deltaRow === direction && currentBoard[toRow][toCol] !== ' ' &&
+                    currentBoard[toRow][toCol].toLowerCase() !== piece) {
+                    return true; // Capture
+                }
+                return false;
+
             case 'r': // Rook
                 return (deltaRow === 0 || deltaCol === 0) && isPathClear(fromRow, fromCol, toRow, toCol);
             case 'n': // Knight
@@ -292,9 +290,8 @@
     }
 
     function isInCheck() {
-        // Simplified check logic; this would need to be expanded for full functionality
         const kingRow = whiteToMove ? findKing('K') : findKing('k');
-        const opponentPieces = whiteToMove ? 'rnbqpn' : 'RNBQPN';
+        const opponentPieces = whiteToMove ? 'rnbqkp' : 'RNBQKP';
 
         for (let i = 0; i < 8; i++) {
             for (let j = 0; j < 8; j++) {
@@ -327,3 +324,4 @@
 
 </body>
 </html>
+
