@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ultimate Chess Application</title>
+    <title>AI Chess Battle</title>
     <link rel="stylesheet" href="https://chessboardjs.com/dist/chessboard-1.0.0.min.css">
     <style>
         body {
@@ -13,44 +13,35 @@
             padding: 20px;
         }
         .board {
-            width: 90vw; 
-            max-width: 400px; 
+            width: 90vw;
+            max-width: 400px;
             margin: auto;
-            border: 2px solid #333;
         }
         .info {
             margin-top: 20px;
-            padding: 5px;
         }
         .move-history {
-            margin-top: 10px;
-            text-align: left;
             max-height: 200px;
             overflow-y: auto;
             border: 1px solid #ccc;
             padding: 5px;
             background-color: white;
+            text-align: left;
         }
         .message {
             color: red;
             margin-top: 10px;
         }
-        .last-move {
-            background-color: rgba(0, 0, 255, 0.5);
-        }
         .controls {
             margin: 20px 0;
         }
-        .theme-selector {
-            margin: 20px;
-        }
         #chat {
-            margin-top: 20px;
             max-height: 150px;
             overflow-y: auto;
             border: 1px solid #ccc;
             padding: 5px;
             background-color: white;
+            margin-top: 20px;
         }
         #chat-input {
             width: 80%;
@@ -60,65 +51,56 @@
             background-color: white;
             border: 1px solid #ccc;
             padding: 10px;
+            margin-top: 10px;
         }
-        .settings-input {
-            margin-bottom: 10px;
+        .last-move {
+            background-color: yellow;
+        }
+        button {
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #ddd;
         }
     </style>
 </head>
 <body>
 
-<h1>Ultimate Chess Application</h1>
+<h1>AI Chess Battle</h1>
 <div id="board" class="board"></div>
 <br>
 <div class="info">
     <div class="controls">
-        <button id="reset">Reset</button>
-        <button id="save">Save Game</button>
-        <button id="load">Load Game</button>
-        <button id="settings-toggle">Settings</button>
-        <button id="analyze">Analyze Game</button>
+        <button id="reset" aria-label="Reset the game">Reset</button>
+        <button id="settings-toggle" aria-label="Toggle settings">Settings</button>
+        <button id="analyze" aria-label="Analyze the game">Analyze Game</button>
     </div>
     <div id="settings">
-        <div class="theme-selector">
-            <label for="theme">Choose a theme:</label>
-            <select id="theme">
-                <option value="default">Default</option>
-                <option value="dark">Dark</option>
-                <option value="light">Light</option>
-            </select>
-        </div>
-        <div class="settings-input">
-            <label for="ai-level">AI Level:</label>
-            <select id="ai-level">
-                <option value="easy">Easy</option>
-                <option value="medium">Medium</option>
-                <option value="hard">Hard</option>
-            </select>
-        </div>
-        <button id="apply-settings">Apply Settings</button>
+        <label for="ai-level">AI Level:</label>
+        <select id="ai-level">
+            <option value="easy">Easy</option>
+            <option value="medium">Medium</option>
+            <option value="hard">Hard</option>
+        </select>
+        <button id="apply-settings" aria-label="Apply selected settings">Apply Settings</button>
     </div>
     <div id="move-history" class="move-history"></div>
     <div class="message" id="message"></div>
     <div id="chat">
         <strong>Chat:</strong><br>
     </div>
-    <input type="text" id="chat-input" placeholder="Type your message...">
-    <button id="send-chat">Send</button>
+    <input type="text" id="chat-input" placeholder="Type your message..." aria-label="Chat input">
+    <button id="send-chat" aria-label="Send chat message">Send</button>
 </div>
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
 <script src="https://chessboardjs.com/dist/chessboard-1.0.0.min.js"></script>
 <script>
-    var board,
-        game = new Chess(),
-        isAIActive = true,
-        aiLevel = 'easy', // Default AI level
-        userProfile = loadUserProfile() || { username: "Guest", history: [], rating: 1200 };
+    let board, game = new Chess();
+    let isAIActive = true, aiLevel = 'easy';
 
-    // Piece values for evaluation
-    var pieceValues = {
+    const pieceValues = {
         'p': 1,
         'r': 5,
         'n': 3,
@@ -127,74 +109,55 @@
         'k': 0
     };
 
-    // Opening book
-    const openingBook = {
-        'e4': ['e5', 'c5', 'e6'],
-        'd4': ['d5', 'Nf6'],
-        'Nf3': ['d5', 'c5', 'e5'], // New openings added
-        'c4': ['e5', 'c6'],
+    const evaluatePosition = () => {
+        let totalValue = 0;
+        game.board().forEach(row => {
+            row.forEach(square => {
+                if (square) {
+                    totalValue += (square.color === 'w' ? 1 : -1) * pieceValues[square.type];
+                }
+            });
+        });
+        return totalValue;
     };
 
-    // Function to evaluate the position based on material count
-    function evaluatePosition() {
-        var totalValue = 0;
-        for (var rank = 0; rank < 8; rank++) {
-            for (var file = 0; file < 8; file++) {
-                var square = game.board()[rank][file];
-                if (square) {
-                    var pieceValue = pieceValues[square.type];
-                    totalValue += square.color === 'w' ? pieceValue : -pieceValue;
-                }
-            }
-        }
-        return totalValue;
-    }
+    const alphaBeta = (depth, game, alpha, beta, maximizingPlayer) => {
+        if (depth === 0) return evaluatePosition();
+        const legalMoves = game.ugly_moves();
 
-    // Alpha-beta pruning algorithm
-    function alphaBeta(depth, game, alpha, beta, maximizingPlayer) {
-        if (depth === 0) {
-            return evaluatePosition();
-        }
-
-        var legalMoves = game.ugly_moves();
         if (maximizingPlayer) {
             let maxEval = -Infinity;
-            for (let move of legalMoves) {
+            for (const move of legalMoves) {
                 game.ugly_move(move);
-                let eval = alphaBeta(depth - 1, game, alpha, beta, false);
+                const eval = alphaBeta(depth - 1, game, alpha, beta, false);
                 game.undo();
                 maxEval = Math.max(maxEval, eval);
                 alpha = Math.max(alpha, eval);
-                if (beta <= alpha) {
-                    break;
-                }
+                if (beta <= alpha) break;
             }
             return maxEval;
         } else {
             let minEval = Infinity;
-            for (let move of legalMoves) {
+            for (const move of legalMoves) {
                 game.ugly_move(move);
-                let eval = alphaBeta(depth - 1, game, alpha, beta, true);
+                const eval = alphaBeta(depth - 1, game, alpha, beta, true);
                 game.undo();
                 minEval = Math.min(minEval, eval);
                 beta = Math.min(beta, eval);
-                if (beta <= alpha) {
-                    break;
-                }
+                if (beta <= alpha) break;
             }
             return minEval;
         }
-    }
+    };
 
-    // Get the best move for the AI
-    function getBestMove() {
+    const getBestMove = () => {
         let bestMove = null;
         let bestValue = -Infinity;
-        let depth = aiLevel === 'hard' ? 4 : aiLevel === 'medium' ? 3 : 2;
+        const depth = aiLevel === 'hard' ? 4 : aiLevel === 'medium' ? 3 : 2;
 
-        for (let move of game.ugly_moves()) {
+        for (const move of game.ugly_moves()) {
             game.ugly_move(move);
-            let boardValue = alphaBeta(depth - 1, game, -Infinity, Infinity, false);
+            const boardValue = alphaBeta(depth - 1, game, -Infinity, Infinity, false);
             game.undo();
             if (boardValue > bestValue) {
                 bestValue = boardValue;
@@ -202,102 +165,14 @@
             }
         }
         return bestMove;
-    }
-
-    // Get an opening move if available
-    function getOpeningMove() {
-        const history = game.history();
-        if (history.length === 0) return null; // No moves yet
-        const lastMove = history[history.length - 1];
-        const possibleResponses = openingBook[lastMove];
-        return possibleResponses ? possibleResponses[Math.floor(Math.random() * possibleResponses.length)] : null;
-    }
-
-    // Save user profile
-    function saveUserProfile() {
-        localStorage.setItem('userProfile', JSON.stringify(userProfile));
-    }
-
-    // Load user profile
-    function loadUserProfile() {
-        const profile = localStorage.getItem('userProfile');
-        return profile ? JSON.parse(profile) : { username: "Guest", history: [], rating: 1200 };
-    }
-
-    // Initialize the chessboard
-    const cfg = {
-        draggable: true,
-        position: 'start',
-        onDrop: function(source, target) {
-            const move = game.move({
-                from: source,
-                to: target,
-                promotion: 'q'
-            });
-
-            if (move === null) return 'snapback';
-
-            renderMoveHistory(game.history());
-            highlightLastMove();
-            if (isAIActive) {
-                setTimeout(makeBestMove, 500);
-            }
-        },
-        onSnapEnd: function() {
-            board.position(game.fen());
-            highlightLastMove();
-        },
     };
 
-    board = ChessBoard('board', cfg);
+    const renderMoveHistory = (moves) => {
+        $('#move-history').empty().append(moves.join(', '));
+        highlightLastMove();
+    };
 
-    $('#reset').on('click', function() {
-        game.reset();
-        board.start();
-        $('#move-history').empty();
-        $('#message').text('');
-        clearHighlights();
-        isAIActive = true; // Reset AI status
-    });
-
-    $('#save').on('click', function() {
-        saveUserProfile();
-        $('#message').text('Game saved!');
-    });
-
-    $('#load').on('click', function() {
-        userProfile = loadUserProfile();
-        $('#message').text('Profile loaded!');
-    });
-
-    $('#theme').on('change', function() {
-        changeTheme(this.value);
-    });
-
-    $('#send-chat').on('click', function() {
-        const message = $('#chat-input').val();
-        if (message) {
-            $('#chat').append('<div>' + message + '</div>');
-            $('#chat-input').val('');
-        }
-    });
-
-    $('#settings-toggle').on('click', function() {
-        $('#settings').toggle();
-    });
-
-    $('#apply-settings').on('click', function() {
-        aiLevel = $('#ai-level').val();
-        $('#message').text('Settings applied!');
-    });
-
-    $('#analyze').on('click', function() {
-        const analysisResult = analyzeGame();
-        $('#message').html(analysisResult);
-    });
-
-    // Highlight the last move
-    function highlightLastMove() {
+    const highlightLastMove = () => {
         const history = game.history();
         if (history.length > 0) {
             const lastMove = history[history.length - 1];
@@ -305,52 +180,66 @@
             const to = lastMove.substring(2, 4);
             $('#' + from).addClass('last-move');
             $('#' + to).addClass('last-move');
-            setTimeout(function() {
+            setTimeout(() => {
                 $('#' + from).removeClass('last-move');
                 $('#' + to).removeClass('last-move');
             }, 1000);
         }
-    }
+    };
 
-    // Render move history
-    function renderMoveHistory(moves) {
-        const historyElement = $('#move-history').empty();
-        historyElement.append(moves.join(', '));
-    }
-
-    // Clear highlights on the board
-    function clearHighlights() {
-        $('.last-move').removeClass('last-move');
-    }
-
-    // Make the best move for the AI
-    function makeBestMove() {
-        const bestMove = getBestMove() || getOpeningMove();
+    const makeBestMove = () => {
+        const bestMove = getBestMove();
         if (bestMove) {
             game.move(bestMove);
             board.position(game.fen());
             renderMoveHistory(game.history());
         }
-    }
+    };
 
-    // Initialize default theme
-    function changeTheme(theme) {
-        if (theme === 'dark') {
-            $('body').css('background-color', '#333').css('color', '#fff');
-        } else {
-            $('body').css('background-color', '#f5f5f5').css('color', '#000');
-        }
-    }
+    const cfg = {
+        draggable: true,
+        position: 'start',
+        onDrop: (source, target) => {
+            const move = game.move({ from: source, to: target, promotion: 'q' });
+            if (move === null) return 'snapback';
+            renderMoveHistory(game.history());
+            if (isAIActive) {
+                setTimeout(makeBestMove, 500);
+            }
+        },
+        onSnapEnd: () => {
+            board.position(game.fen());
+        },
+    };
 
-    // Load user profile on startup
-    $(document).ready(function() {
-        if (userProfile) {
-            $('#message').text(`Welcome back, ${userProfile.username}!`);
-        }
+    $(document).ready(() => {
+        board = ChessBoard('board', cfg);
+        $('#reset').on('click', () => {
+            game.reset();
+            board.start();
+            $('#move-history').empty();
+            $('#message').text('');
+        });
+
+        $('#settings-toggle').on('click', () => {
+            $('#settings').toggle();
+        });
+
+        $('#apply-settings').on('click', () => {
+            aiLevel = $('#ai-level').val();
+            $('#message').text('Settings applied!');
+        });
+
+        $('#send-chat').on('click', () => {
+            const message = $('#chat-input').val();
+            if (message) {
+                $('#chat').append('<div>' + message + '</div>');
+                $('#chat-input').val('');
+            }
+        });
+
+        $('#message').text('Welcome to AI Chess Battle! Good luck!');
     });
-
-    // Request permission for notifications
-    Notification.requestPermission();
 </script>
 
 </body>
